@@ -34,7 +34,7 @@ class AtomicTaskGenerator(OperatorABC):
     
     def _validate_dataframe(self, dataframe: pd.DataFrame):
         required_keys = [self.input_key]
-        forbidden_keys = [self.output_refined_answer_key, self.output_answer_key, self.output_question_key]
+        forbidden_keys = [self.output_refined_answer_key, self.output_answer_key, self.output_question_key, self.output_optional_answer_key, self.output_golden_doc_answer_key, self.output_f1_score_key]
 
         missing = [k for k in required_keys if k not in dataframe.columns]
         conflict = [k for k in forbidden_keys if k in dataframe.columns]
@@ -121,20 +121,43 @@ class AtomicTaskGenerator(OperatorABC):
         recall_scores = self.llm_serving.generate_from_input(user_prompts, sys_prompts)
         valid_scores = []
         for score_str in recall_scores:
-            if score_str is not None:
-                try:
-                    score_dict = json.loads(self._clean_json_block(score_str))
-                    valid_scores.append(score_dict["answer_score"])
-                except (json.JSONDecodeError, KeyError):
-                    print("recall score_str error:", score_str)
-                    valid_scores.append(0)
-                    continue
+            try:
+                score_dict = json.loads(self._clean_json_block(score_str))
+                valid_scores.append(score_dict["answer_score"])
+            except Exception as e:
+                print("recall score_str error:", score_str, "\nError:", e)
+                valid_scores.append(0)
+                continue
+        # for score_str in recall_scores:
+        #     if score_str is not None:
+        #         try:
+        #             score_dict = json.loads(self._clean_json_block(score_str))
+        #             valid_scores.append(score_dict["answer_score"])
+        #         except (json.JSONDecodeError, KeyError):
+        #             print("recall score_str error:", score_str)
+        #             valid_scores.append(0)
+        #             continue
         return valid_scores
 
     def more_optional_answer(self, dataframe):
         original_answer = dataframe[self.output_refined_answer_key]
         system_prompt, user_prompts = self._reformat_prompt(dataframe, "more_optional_answer")
         optional_answers = self.llm_serving.generate_from_input(user_prompts, system_prompt)
+        valid_answers = []
+        for optional_answer in optional_answers:
+            try:
+                if isinstance(optional_answers, str):
+                    optional_answer = json.loads(self._clean_json_block(optional_answer))
+                    if orginal_answer not in optional_answer:
+                        optional_answer.insert(0, original_answer)
+                    valid_answers.append(optional_answer)
+                else:
+                    valid_answers.append(original_answer)
+            except Exception as e:
+                print(f"Error parsing optional answer: {optional_answer} | Error: {e}")
+                valid_answers.append(original_answer)
+        return valid_answers
+        
         # self.logger.info(f"Response from optional answer: {optional_answers}")
         # self.logger.info(f"optional answer type: {type(optional_answers)}")
 
@@ -163,8 +186,8 @@ class AtomicTaskGenerator(OperatorABC):
 
         f1_scores = []
         for idx, row in dataframe.iterrows():
-            prediction = row["golden_doc_answer"]
-            ground_truths = row["optional_answer"]
+            prediction = row[self.output_golden_doc_answer_key]
+            ground_truths = row[self.output_optional_answer_key]
 
             final_metric = {"f1": 0, "precision": 0, "recall": 0}
 
@@ -215,12 +238,20 @@ class AtomicTaskGenerator(OperatorABC):
         input_key: str = "prompts",
         output_question_key: str = "question",
         output_answer_key:str = "answer",
-        output_refined_answer_key:str = "refined_answer"
+        output_refined_answer_key:str = "refined_answer",
+        output_optional_answer_key: str = "optional_answer",
+        output_golden_doc_answer_key: str = "golden_doc_answer",
+        output_f1_score_key: str = "f1_score",
+        data_num: int = 10, # Number of rows to process from the input dataframe 
+        max_per_task: int = 10, # Limit the number of candidate tasks per input
+        max_question: int = 10  # Limit the question of each doc
     ):
-        data_num = 30000
         self.input_key, self.output_question_key = input_key, output_question_key
         self.output_answer_key, self.output_refined_answer_key = output_answer_key, output_refined_answer_key
-        dataframe = storage.read("dataframe").iloc[:data_num]
+        self.output_optional_answer_key, self.output_golden_doc_answer_key, self.output_f1_score_key = output_optional_answer_key, output_golden_doc_answer_key, output_f1_score_key
+        self.data_num, self.max_per_task, self.max_question = data_num, max_per_task, max_question
+
+        dataframe = storage.read("dataframe").iloc[:self.data_num]
         self._validate_dataframe(dataframe)
 
         # === Step 0: Get identifier
@@ -238,6 +269,7 @@ class AtomicTaskGenerator(OperatorABC):
         for idx, (row, output_str, identifier) in enumerate(zip(dataframe.itertuples(index=False), conclusions, identifiers)):
             try:
                 parsed = json.loads(self._clean_json_block(output_str))
+                parsed = parsed[:self.max_per_task] if isinstance(parsed, list) else parsed
             except Exception as e:
                 print(f"[WARN] JSON parse failed at idx={idx}: {e} | output: {output_str}")
                 continue
@@ -323,16 +355,16 @@ class AtomicTaskGenerator(OperatorABC):
         dataframe = dataframe.drop(columns="llm_answer")
 
         self.logger.info("generate more optional answer...")
-        dataframe["optional_answer"] = self.more_optional_answer(dataframe)
+        dataframe[self.output_optional_answer_key] = self.more_optional_answer(dataframe)
 
         self.logger.info("get golden doc answer...")
         sys_prompts, user_prompts = self._reformat_prompt(dataframe, "golden_doc_answer")
         llm_answer_results = self.llm_serving.generate_from_input(user_prompts, sys_prompts)
-        dataframe["golden_doc_answer"] = llm_answer_results
+        dataframe[self.output_golden_doc_answer_key] = llm_answer_results
 
         self.logger.info("get f1 score...")
-        dataframe["f1_score"] = self.get_f1_score(dataframe)
-        #dataframe = dataframe[(dataframe["f1_score"] > 0.1) & (dataframe["f1_score"] < 0.9)].reset_index(drop=True)
+        dataframe[self.output_f1_score_key] = self.get_f1_score(dataframe)
+        #dataframe = dataframe[(dataframe[self.output_f1_score_key] > 0.1) & (dataframe[self.output_f1_score_key] < 0.9)].reset_index(drop=True)
         
         # os.makedirs("debug_outputs", exist_ok=True)
         # with open("debug_outputs/df1.txt", "w", encoding="utf-8") as f:
@@ -341,13 +373,12 @@ class AtomicTaskGenerator(OperatorABC):
         #             f.write(f"{k}: {v}\n")
         #         f.write("\n" + "-"*80 + "\n\n")
 
-        max_question = 5
         dataframe = (
             dataframe.groupby("id", group_keys=False)
-            .apply(lambda x: x.head(max_question))
+            .apply(lambda x: x.head(self.max_question))
             .reset_index(drop=True)
         )
 
         output_file = storage.write(dataframe)
         self.logger.info(f"Results saved to {output_file}")
-        return "identifier", "candidate_tasks_str", self.output_question_key, self.output_answer_key, self.output_refined_answer_key #NEED MORE？
+        return "identifier", "candidate_tasks_str", self.output_question_key, self.output_answer_key, self.output_refined_answer_key, self.output_optional_answer_key, self.output_golden_doc_answer_key, self.output_f1_score_key
