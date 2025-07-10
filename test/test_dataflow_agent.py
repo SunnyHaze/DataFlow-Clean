@@ -94,7 +94,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "recommend":
         test_req = ChatAgentRequest(
             language="zh",
-            target="帮我针对数据推荐一个的pipeline!!!我只想要前4个处理算子！！！其余的都不要！！",
+            target="帮我针对数据推荐一个的pipeline!!!不需要去重的算子 ！",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
             **pipeline_recommand_params
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "write":
         test_req = ChatAgentRequest(
             language="zh",
-            target="我需要一个新的算子，这个算子可以使用MinHash算法进行文本去重!!",
+            target="我需要一个算子，能够计算文本的可读性分数并给出优化建议。",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
             ** operator_write_params

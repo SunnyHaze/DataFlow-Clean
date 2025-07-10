@@ -1,3 +1,41 @@
+#!/usr/bin/env python3
+"""
+post_processor.py ── Post-processing Utilities for Operator Code and Pipeline Results
+Author  : [Zhou Liu]
+License : MIT
+Created : 2024-07-10
+
+This module provides utility functions for handling post-processing tasks in model-driven or agent-based
+dataflow systems, especially those involving operator code generation and pipeline structure extraction.
+
+Features:
+* Operator code saver: Safely writes generated operator code to disk, creating necessary directories.
+* Pipeline result combiner: Merges and formats pipeline edge/node information from multi-stage task outputs,
+  normalizes node IDs, and prepares a standardized result for downstream consumption or visualization.
+* Flexible handling of different node info formats (list of dicts or dict of operator descriptions).
+* Robust against malformed or incomplete input data, with normalization and filtering logic for nodes and edges.
+
+Designed for use in automatic code generation, LLM agent pipelines, AutoML flows, or similar systems
+where dynamic assembly and export of operator code and pipeline graphs are needed.
+
+Thread-safety: This module is not inherently thread-safe. If used in parallel processing contexts,
+appropriate synchronization or file locking is recommended.
+
+Dependencies:
+- Python 3.8+
+- Standard library: pathlib, uuid, typing, json
+- Project-local utilities: get_operator_content, get_operator_descriptions, ChatAgentRequest
+
+Typical Usage:
+    from pipeline_postprocess import post_process_save_op_code, post_process_combine_pipeline_result
+
+    # Save generated operator code
+    post_process_save_op_code(request, last_result)
+
+    # Combine and format pipeline results after multi-stage processing
+    pipeline_result = post_process_combine_pipeline_result(last_result, task_results)
+
+"""
 from pathlib import Path
 import uuid
 from typing import Dict, Any, List, Union
@@ -11,10 +49,10 @@ def post_process_save_op_code(request: ChatAgentRequest,
     try:
         code: str = last_result["code"]
     except KeyError: 
-        raise ValueError("`last_result` 字典缺少 'code' 键，无法保存代码。")
+        raise ValueError("The `last_result` dictionary is missing the 'code' key; unable to save the code.")
     py_path = Path(request.py_path)     
-    py_path.parent.mkdir(parents=True, exist_ok=True) 
-    py_path.write_text(code, encoding="utf-8")
+    py_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure the parent directory exists
+    py_path.write_text(code, encoding="utf-8")         # Write the code to the specified file path
     
 
 def post_process_combine_pipeline_result(

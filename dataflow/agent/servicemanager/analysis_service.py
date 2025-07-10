@@ -1,6 +1,6 @@
 """
 analysis_service.py  ── Analysis service for multi-step conversation & task chain
-Author  : Zhou Liu
+Author  : [Zhou Liu]
 License : MIT
 Created : 2024-06-25
 

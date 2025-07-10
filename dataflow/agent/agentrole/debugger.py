@@ -45,8 +45,7 @@ class DebugAgent:
         self.prompt_generator = self.task.prompts_template
         self.json_template_prompts = self.prompt_generator.json_form_templates
         self.request = request
-        self.json_template_keys = {} #跟任务绑定固定的模板
-        # 在通过Tool做最后处理
+        self.json_template_keys = {}
     async def llm_caller(self,prompts:str):
         json_data = {
             "model": 'o3',

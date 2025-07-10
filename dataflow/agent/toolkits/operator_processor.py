@@ -1,3 +1,40 @@
+#!/usr/bin/env python3
+"""
+operator_codegen.py ── Operator Code Generation and Debugging Utilities
+Author  : [Zhou Liu]
+License : MIT
+Created : 2024-07-10
+
+This module provides utilities for dynamic code generation, discovery, retrieval, and execution of DataFlow operators
+within a model-driven workflow (such as LLM-based agent pipelines).
+
+Features:
+* Automatic operator main-file generation: Wraps an operator class with a runnable script for quick testing and deployment.
+* Operator class discovery: Finds the first valid operator class in a given module based on registration and inheritance.
+* Source code extraction: Retrieves and formats the source code of operator classes for inspection or debugging.
+* Automated execution: Supports dry-run or actual execution of the auto-generated operator script with logging.
+* LLM serving integration: Handles both remote (API) and local (VLLM) language model serving preparation for operator instantiation.
+* Error handling and clear logging throughout the code generation and execution process.
+
+Intended for advanced developer workflows where operators are written, debugged, and tested semi-automatically,
+especially in agent-driven or AutoML/dataflow systems.
+
+Thread-safety: This module is not inherently thread-safe. Ensure safe usage in concurrent or distributed environments.
+
+Dependencies:
+- dataflow (core framework for OperatorABC, storage, and serving)
+- Python 3.8+
+- Standard library: importlib, inspect, pathlib, subprocess, sys, textwrap, typing, os
+
+Usage:
+    # Typical usage scenario
+    from operator_codegen import generate_operator_py, local_tool_for_debug_and_exe_operator
+
+    # Generate runnable operator code and optionally execute it
+    code = generate_operator_py(request)
+    result = local_tool_for_debug_and_exe_operator(request, dry_run=False)
+
+"""
 import importlib
 import inspect
 import os
@@ -18,7 +55,12 @@ def _py_literal(val: Any) -> str:
     return repr(val)
 
 def _find_first_operator(module) -> type:
-    """返回模块中第一个同时满足  (1) 是类  (2) 继承 OperatorABC  (3) 在 OPERATOR_REGISTRY 里  的类"""
+    """
+    Return the first class in the module that satisfies all of the following:
+    (1) is a class,
+    (2) inherits from OperatorABC,
+    (3) is registered in OPERATOR_REGISTRY.
+    """
     from dataflow.core import OperatorABC
     from dataflow.utils.registry import OPERATOR_REGISTRY
 
@@ -26,7 +68,7 @@ def _find_first_operator(module) -> type:
         if inspect.isclass(obj) and issubclass(obj, OperatorABC) and obj is not OperatorABC:
             if OPERATOR_REGISTRY.get(obj.__name__) is obj:
                 return obj
-    raise RuntimeError("未在该文件中找到符合要求的算子类")
+    raise RuntimeError("No eligible operator class found in this file")
 
 def generate_operator_py(
     request: ChatAgentRequest,

@@ -210,7 +210,7 @@ class MemoryClient:
                 url,
                 headers=headers,
                 json=json_data,
-                timeout=120.0
+                timeout=360.0
             )
             resp.raise_for_status()
             result = resp.json()

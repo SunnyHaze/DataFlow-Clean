@@ -1496,6 +1496,36 @@
             "name": "output_refined_answer_key",
             "default": "refined_answer",
             "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "output_optional_answer_key",
+            "default": "optional_answer",
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "output_golden_doc_answer_key",
+            "default": "golden_doc_answer",
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "output_f1_score_key",
+            "default": "f1_score",
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "data_num",
+            "default": 10,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "max_per_task",
+            "default": 10,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "max_question",
+            "default": 10,
+            "kind": "POSITIONAL_OR_KEYWORD"
           }
         ]
       },
