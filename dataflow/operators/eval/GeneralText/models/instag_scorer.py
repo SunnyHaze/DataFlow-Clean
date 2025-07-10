@@ -5,8 +5,6 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from scipy.special import softmax
-import requests
 import torch
 from dataflow import get_logger
 import json
@@ -14,7 +12,8 @@ import json
 @OPERATOR_REGISTRY.register()
 class InstagScorer(OperatorABC):
     def __init__(self, model_cache_dir='./dataflow_cache', device='cuda', max_new_tokens=1024, temperature=0, do_sample=False, num_return_sequences=1, return_dict_in_generate=True):
-        # Initialize parameters and model
+        self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_name = 'OFA-Sys/InsTagger'
         self.model_cache_dir = model_cache_dir
@@ -23,12 +22,14 @@ class InstagScorer(OperatorABC):
         self.do_sample = do_sample
         self.num_return_sequences = num_return_sequences
         self.return_dict_in_generate = return_dict_in_generate
-        self.score_type = float
-        self.logger = get_logger()
-        self.logger.info(f"Using local model: {self.model_name}")
-        # Token strings and score template
         self.token_strs = ["1", "2", "3", "4", "5", "6"]
         self.score_template = np.array([1, 2, 3, 4, 5, 6])
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, cache_dir=self.model_cache_dir).to(self.device)
+        self.model.requires_grad_(False)
+        self.model.eval()
+        self.score_name = 'InstagScore'
+        self.logger.info(f'{self.__class__.__name__} initialized.')
 
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -81,17 +82,15 @@ class InstagScorer(OperatorABC):
         return json_outputs
 
     def _score_func(self, sample, input_instruction_key):
-        """Evaluate a batch of queries and return corresponding scores."""
-        # query = sample.get(input_instruction_key, '')
         json_output = self.inference_batch([sample])[0]
         complexity_score = None
         if isinstance(json_output, list):
             complexity_score = len(json_output)
             self.logger.info(f"列表类型JSON,标签数量: {complexity_score}")
-        elif isinstance(json_output, dict) and "tag" in json_output:  # 单个标签返回为字典
+        elif isinstance(json_output, dict) and "tag" in json_output: 
             complexity_score = 1
             self.logger.info(f"字典类型JSON,包含tag字段,评分为1")
-        elif isinstance(json_output, dict) and len(json_output) > 0:  # 其他字典类型,有内容
+        elif isinstance(json_output, dict) and len(json_output) > 0: 
             complexity_score = 1
             self.logger.info(f"其他字典类型JSON,评分为1: {json_output}")
         else:
@@ -100,26 +99,15 @@ class InstagScorer(OperatorABC):
         return complexity_score
 
     def eval(self, dataframe: pd.DataFrame, input_instruction_key: str):
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, cache_dir=self.model_cache_dir).to(self.device)
-        self.model.requires_grad_(False)
-        self.model.eval()
+        self.logger.info(f"Evaluating {self.score_name}...")
         scores = []
-        for sample in tqdm(dataframe[input_instruction_key], desc="InstagScorer Evaluating..."):
+        for sample in tqdm(dataframe[input_instruction_key], desc="Instagger mode evaluating..."):
             scores.append(self._score_func(sample, input_instruction_key))
-        del self.tokenizer
-        del self.model
-        import gc;
-        gc.collect()
-        torch.cuda.empty_cache()
+        self.logger.info("Evaluation complete!")
         return scores
 
-    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', output_key: str = 'instag_score'):
-        """Process the batch and store results under the specified output_key."""
+    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', output_key: str = 'InstagScore'):
         dataframe = storage.read("dataframe")
         scores = self.eval(dataframe, input_instruction_key)
-        
-        # Store the results in the output_key (create multiple columns if needed)
         dataframe[output_key] = scores
-        
         storage.write(dataframe)

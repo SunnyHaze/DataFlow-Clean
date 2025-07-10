@@ -16,16 +16,16 @@
 [简体中文](./README-zh.md) | English
 
 
-**[Features](#Features) • [Quick Start](#Quick_Start) • [Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [Experiments](#Experiments)**
+**[🚀 Features](#Features) • [⚡ Quick Start](#Quick_Start) • [📖 Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 Experiments](#Experiments)**
 
 </div>
 
-https://github.com/user-attachments/assets/3dadeeb0-7007-4cdf-b412-593af000020c
+https://github.com/user-attachments/assets/05e047a5-99bb-4043-bc71-2b5ccdab2126
 
-## 1 News
+## 📰 1. News
 🎉 [2025-06-28] We’re excited to announce that DataFlow, our Data-centric AI system, is now released! Stay tuned for future updates.
 
-## 2 Overview
+## 🔍 2. Overview
 
   <img src="./static/images/dataflow_framework.jpg">
 
@@ -42,26 +42,26 @@ Agentic RAG: 输入QA，出来是 QA。没有额外信息解决不了，必须�
 Knowlege Base Cleaning: PDF，表格+doc text输入，输出是高质量知识库
 Dataflow-agent: 用Agent自动合成pipeline。编排已有算子。 -->
 
-## 3 Pipelines Functionality
-### 3.1 Ready-to-Use PipeLines
+## 🛠️ 3. Pipelines Functionality
+### 🔧 3.1 Ready-to-Use PipeLines
 Current Pipelines in Dataflow are as follows:
-- **Text Pipeline**: Mine question-answer pairs from large-scale plain-text data (mostly crawed from InterNet) for use in SFT and RL training.
+- 📝 **Text Pipeline**: Mine question-answer pairs from large-scale plain-text data (mostly crawed from InterNet) for use in SFT and RL training.
   - ![](./static/images/dataflow_text_pipeline.jpg)
   - [[HuggingFace🤗 demo input & output for **Text Pipeline**]](https://huggingface.co/datasets/Open-Dataflow/dataflow-demo-Text)
-- **Reasoning Pipeline**: Enhances existing question–answer pairs with (1) extended chain-of-thought, (2) category classification, and (3) difficulty estimation.
+- 🧠 **Reasoning Pipeline**: Enhances existing question–answer pairs with (1) extended chain-of-thought, (2) category classification, and (3) difficulty estimation.
   - ![](./static/images/dataflow_reasoning_pipeline.jpg)
   - [[HuggingFace🤗 demo input & output for **Reasoning Pipeline**]](https://huggingface.co/datasets/Open-Dataflow/dataflow-demo-Reasonning)
-- **Text2SQL Pipeline**: Translates natural language questions into SQL queries, supplemented with explanations, chain-of-thought reasoning, and contextual schema information.
+- 🗃️ **Text2SQL Pipeline**: Translates natural language questions into SQL queries, supplemented with explanations, chain-of-thought reasoning, and contextual schema information.
   - ![](./static/images/dataflow_text2sql_pipeline.jpg)
   - [[HuggingFace🤗 demo input & output for **Text2SQL Pipeline**]](https://huggingface.co/datasets/Open-Dataflow/dataflow-demo-Text2SQL)
-- **Knowlege Base Cleaning Pipeline**: Extract and structure knowledge from unorganized sources like tables, PDFs, and Word documents into usable entries for downstream RAG or QA pair generation.
+- 📚 **Knowlege Base Cleaning Pipeline**: Extract and structure knowledge from unorganized sources like tables, PDFs, and Word documents into usable entries for downstream RAG or QA pair generation.
   - ![](./static/images/dataflow_KnowledgeBaseClean_pipeline.jpg)
-- **Agentic RAG Pipeline**: Identify and extract QA pairs from existing QA datasets or knowledge bases that require external knowledge to answer, for use in downstream training of Agnetic RAG tasks.
-
-### 3.2 Flexible Operator PipeLines
+- 🤖 **Agentic RAG Pipeline**: Identify and extract QA pairs from existing QA datasets or knowledge bases that require external knowledge to answer, for use in downstream training of Agnetic RAG tasks.
+  - ![](./static/images/dataflow_agenticRAG_pipeline.jpg)
+### ⚙️ 3.2 Flexible Operator PipeLines
 In this framework, operators are categorized into Fundamental Operators, Generic Operators, Domain-Specific Operators, and Evaluation Operators, etc., supporting data processing and evaluation functionalities. Please refer to the [documentation](https://OpenDCAI.github.io/DataFlow-Doc/) for details.
 
-### 3.3 Agent Guided Pipelines
+### 🤖 3.3 Agent Guided Pipelines
 <!-- Building on top of this, we also provide the -->
 - **DataFlow Agent**: Can arrange existing `operators` and automatically construct new pipelines based on task requirements.
   - ![](./static/images/dataflow_agent_pipeline.jpg)
@@ -70,7 +70,7 @@ In this framework, operators are categorized into Fundamental Operators, Generic
 <!-- ### 3.1 Text Pipeline
 ![](./static/images/demo_reasoning.png) -->
 
-## 4 Quick Start
+## ⚡ 4. Quick Start
 For environment setup and installation, please using the following commands👇
 
 ```shell
@@ -104,42 +104,83 @@ For **Quick-Start** and **Guide**, please visit our [Documentation](https://Open
 [![Documents](https://img.shields.io/badge/Documents-Click_here-brightgreen?logo=read-the-docs)](https://OpenDCAI.github.io/DataFlow-Doc/)
 
 
-## 5 Experimental Results
+## 🧪 5. Experimental Results
 For Detailed Experiments setting, please visit our documentation.
 
 
-### 5.1 Text PipeLine
+### 📝 5.1 Text PipeLine
 
 #### 5.1.1 Pre-training data filter pipeline
 The `pre-training data processing pipeline` was applied to randomly sampled data from the RedPajama dataset, resulting in a final data retention rate of 13.65%. The analysis results using `QuratingScorer` are shown in the figure. As can be seen, the filtered pretraining data significantly outperforms the original data across four scoring dimensions: writing style, requirement for expert knowledge, factual content, and educational value. This demonstrates the effectiveness of the DataFlow pretraining data processing.
 
-![alt text](./static/images/text-pretrain.png)
-
+<div align="center">
+  <img src="./static/images/text-pretrain.png" width="60%">
+</div>
 
 #### 5.1.2 SFT data filter pipeline
 We filted 3k record from `alpaca` dataset and compare it with radom selected 3k data from `alpaca` dataset by training it on Qwen2.5-7B. Results are:
-<p align="center">
-  <img src="./static/images/text-sft.png" alt="text-sft" width="80%" />
-</p>
 
-### 2. Reasoning Pipeline
+<div align="center">
+  <img src="./static/images/text-sft.png" width="60%">
+</div>
+
+### 🧠 5.2 Reasoning Pipeline
 
 We verify our reasoning pipeline by SFT on a Qwen2.5-32B-Instruct with Reasoning Pipeline synsthized data. We generated 1k and 5k SFT data pairs. Results are: 
-<p align="center">
-  <img src="./static/images/reasoning_performance.png" alt="text-sft" width="80%" />
-</p>
 
+<div align="center">
+  <img src="./static/images/reasoning_performance.png" width="60%">
+</div>
 
-### 3. Text2SQL PipeLine
+### 🗃️ 5.3 Text2SQL PipeLine
 We fine-tuned the Qwen2.5-Coder-14B model on the Bird dataset using both Supervised Fine-tuning (SFT) and Reinforcement Learning (RL), with data constructed via the DataFlow-Text2SQL Pipeline. Results are:
-![alt text](./static/images/text2sql.png)
 
-<!-- ## Statistics
-<a href="https://star-history.com/#OpenDCAI/DataFlow&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=OpenDCAI/DataFlow&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=OpenDCAI/DataFlow&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=OpenDCAI/DataFlow&type=Date" />
- </picture>
-</a>
- -->
+<div align="center">
+  <img src="./static/images/text2sql.png" width="60%">
+</div>
+
+## 🤝 6. Community & Support
+Join the DataFlow open-source community to ask questions, share ideas, and collaborate with other developers!
+
+•	📮 [GitHub Issues](../../issues): Report bugs or suggest features
+ 
+•	🔧 [GitHub Pull Requests](../../pulls): Contribute code improvements
+
+•	💬 Join our community groups to connect with us and other contributors!
+ 
+<div align="center">
+  <img src="./static/images/community_en.jpg" width="60%">
+</div>
+
+## 📜 7. Citation
+If you use DataFlow in your research, feel free to give us a cite.
+```bibtex
+@misc{dataflow2025,
+  author       = {DataFlow Develop Team},
+  title        = {DataFlow: A Unified Framework for Data-Centric AI},
+  year         = {2025},
+  howpublished = {\url{https://github.com/OpenDCAI/DataFlow}},
+  note         = {Accessed: 2025-07-08}
+}
+```
+
+## 📊 8. Statistics
+<div align="center">
+  <a href="https://star-history.com/#OpenDCAI/DataFlow&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=OpenDCAI/DataFlow&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=OpenDCAI/DataFlow&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=OpenDCAI/DataFlow&type=Date" style="width:50%;" />
+    </picture>
+  </a>
+  
+</div>
+
+---
+<div align="center">
+  <sub>
+    Developed and maintained by the 
+    <a href="https://zwt233.github.io/" target="_blank"><strong>PKU-DCAI Research Team</strong></a> ❤️ <br>
+    Connect with us on Xiaohongshu: <strong>26133106768</strong>
+  </sub>
+</div>

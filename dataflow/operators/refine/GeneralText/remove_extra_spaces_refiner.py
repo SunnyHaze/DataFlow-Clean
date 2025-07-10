@@ -9,6 +9,7 @@ from dataflow.utils.registry import OPERATOR_REGISTRY
 class RemoveExtraSpacesRefiner(OperatorABC):
     def __init__(self):
         self.logger = get_logger()
+        self.logger.info(f"Initializing {self.__class__.__name__} ...")
 
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -17,6 +18,7 @@ class RemoveExtraSpacesRefiner(OperatorABC):
     def run(self, storage: DataFlowStorage, input_key: str):
         self.input_key = input_key
         dataframe = storage.read("dataframe")
+        self.logger.info(f"Running {self.__class__.__name__} with input_key = {self.input_key}...")
         numbers = 0
         refined_data = []
 
@@ -37,6 +39,6 @@ class RemoveExtraSpacesRefiner(OperatorABC):
 
         dataframe[self.input_key] = refined_data
         storage.write(dataframe)
-        self.logger.info(f"Refining completed. Total items modified: {numbers}")
+        self.logger.info(f"Refining Complete. Total modified items: {numbers}")
 
         return [self.input_key]

@@ -9,7 +9,7 @@ from dataflow.operators.generate.KnowledgeCleaning import (
     MultiHopQAGenerator,
 )
 from dataflow.utils.storage import FileStorage
-from dataflow.llmserving import LocalModelLLMServing
+from dataflow.serving import LocalModelLLMServing
 
 # 这里或许未来可以有个pipeline基类
 class KBCleaningPipeline():

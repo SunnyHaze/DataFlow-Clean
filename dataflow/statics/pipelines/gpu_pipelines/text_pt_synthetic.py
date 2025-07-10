@@ -30,7 +30,7 @@ from dataflow.operators.refine.GeneralText import (
     RemoveExtraSpacesRefiner
 )
 from dataflow.operators.generate.GeneralText import PretrainGenerator
-from dataflow.llmserving import LocalModelLLMServing
+from dataflow.serving import LocalModelLLMServing_vllm
 from dataflow.utils.storage import FileStorage
 
 class PTTextSynPipeline():
@@ -44,11 +44,10 @@ class PTTextSynPipeline():
         
         
         self.model_cache_dir = './dataflow_cache'
-        self.llm_serving = LocalModelLLMServing(
-            model_name_or_path='Qwen/Qwen2.5-7B-Instruct',
-            tensor_parallel_size=1,
-            max_tokens=8192,
-            model_source="local"
+        self.llm_serving = LocalModelLLMServing_vllm(
+            hf_model_name_or_path='Qwen/Qwen2.5-7B-Instruct',
+            vllm_tensor_parallel_size=1,
+            vllm_max_tokens=8192,
         )
         self.language_filter = LanguageFilter(allowed_languages = '__label__eng_Latn', model_cache_dir = self.model_cache_dir)        
         self.remove_extra_spaces_refiner = RemoveExtraSpacesRefiner()

@@ -85,3 +85,32 @@ class AlpagasusPrompt:
         生成user prompt
         """
         return self.user_prompt_template.format(dimension=self.dimension)
+
+class TreeinstructPrompt:
+    def __init__(self):
+        self.system_prompt_template = """
+        You are an instruction rewriter. You need to parse a given user instruction into a TREE structure following Semantic Parsing in the natural language processing field.
+        Procedure:
+        step-1: Parse the old “instruction” to a TREE-1 through Semantic Parsing in the natural language processing field. 
+        Count and return the number of nodes in TREE-1.
+        Old instruction: “{instruction}”
+        """
+
+        self.user_prompt_template = """
+        Please count and return the number of nodes in TREE-1. This number represents the complexity of the original instruction.
+        Output the number in the single LAST line. You must ensure the last line is only the number of the tree, without other symbols, like ```.
+        For example:
+        4
+        """
+    
+    def build_system_prompt(self, instruction):
+        """
+        根据给定的指令生成 system prompt
+        """
+        return self.system_prompt_template.format(instruction=instruction)
+    
+    def build_user_prompt(self):
+        """
+        生成 user prompt
+        """
+        return self.user_prompt_template

@@ -12,6 +12,8 @@ import torch
 class QuratingScorer(OperatorABC):
     def __init__(self, map_batch_size: int = 512, num_workers: int = 1, device_batch_size: int = 16, device: str = 'cuda', 
                  labels: list = ['writing_style', 'required_expertise', 'facts_and_trivia', 'educational_value'], model_cache_dir: str = './dataflow_cache'):
+        self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.model = 'princeton-nlp/QuRater-1.3B'
         self.tokens_field = 'input_ids'
         self.tokens = 512
@@ -25,7 +27,7 @@ class QuratingScorer(OperatorABC):
         self.score_type = float 
         self.data_type = 'text'  
         self.score_name = 'QuratingScore'
-        self.logger = get_logger()
+        self.logger.info(f'{self.__class__.__name__} initialized.')
 
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -67,8 +69,7 @@ class QuratingScorer(OperatorABC):
         return result_filtered
 
     def eval(self, dataframe, input_key):
-        """Evaluate the scores for each row in the dataframe."""
-
+        self.logger.info(f"Evaluating {self.score_name}...")
         batch_dict = {'text': dataframe[input_key]}  # Wrap sample into a list for processing
         dataset = Dataset.from_dict(batch_dict)
         # Tokenize and chunk
@@ -88,30 +89,20 @@ class QuratingScorer(OperatorABC):
             batch_size=self.map_batch_size,
             remove_columns=dataset.column_names
         )
-
         results_dict = dataset.to_dict()
-
         result_filtered = {}
-
         for label in self.labels:
             average_key = f"{label}_average"
-            
-            # Ensure the average_key exists in the current results_dict entry
             if average_key in results_dict:
-                # Build a new key based on the label
                 new_key = f"Qurating{''.join([word.capitalize() for word in label.split('_')])}Score"
-                
-                # Assign the corresponding value from the results_dict to the new key in result_filtered
                 result_filtered[new_key] = results_dict[average_key]  # Use the average values
 
+        self.logger.info("Evaluation complete!")
         return result_filtered
 
     def run(self, storage: DataFlowStorage, input_key: str, output_key: str):
-        """Read the dataframe, evaluate the scores, and store the results."""
         dataframe = storage.read("dataframe")
         scores = self.eval(dataframe, input_key)
-        
-        # Flatten results into the dataframe
         for score_dict in scores:
             for key, value in score_dict.items():
                 if key not in dataframe:

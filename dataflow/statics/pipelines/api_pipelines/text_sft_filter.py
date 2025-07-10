@@ -2,7 +2,7 @@
 from dataflow.operators.process.GeneralText import AlpagasusFilter
 
 from dataflow.utils.storage import FileStorage
-from dataflow.llmserving import APILLMServing_request
+from dataflow.serving import APILLMServing_request
 import os
 
 

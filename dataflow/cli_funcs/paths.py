@@ -29,6 +29,10 @@ class DataFlowPath:
     def get_dataflow_pipelines_dir():
         return DataFlowPath.get_dataflow_statics_dir() / "pipelines"
     
+    @staticmethod
+    def get_dataflow_agent_dir():
+        return DataFlowPath.get_dataflow_dir() / "agent"
+    
     # @staticmethod
     # def get_dataset_json_dir() -> Path:
     #     return DataFlowPath.get_dataflow_dir() / "dataset_json"

@@ -1,4 +1,4 @@
-from dataflow.llmserving import LocalModelLLMServing
+from dataflow.serving import LocalModelLLMServing
 from transformers import AutoTokenizer, AutoConfig, XLMRobertaXLModel
 a = LocalModelLLMServing(
     model_name_or_path="/mnt/public/model/huggingface/Qwen2.5-7B-Instruct",

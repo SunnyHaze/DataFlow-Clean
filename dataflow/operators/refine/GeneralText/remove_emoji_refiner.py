@@ -11,7 +11,7 @@ class RemoveEmojiRefiner(OperatorABC):
     def __init__(self):
         self.logger = get_logger()
         self.refiner_name = 'RemoveEmojiRefiner'
-        self.logger.info(f"Initializing {self.refiner_name}...")
+        self.logger.info(f"Initializing {self.__class__.__name__} ...")
 
         # Emoji pattern for matching emojis in the text
         self.emoji_pattern = re.compile(
@@ -34,6 +34,7 @@ class RemoveEmojiRefiner(OperatorABC):
         dataframe = storage.read("dataframe")
         numbers = 0
         refined_data = []
+        self.logger.info(f"Running {self.__class__.__name__} with input_key = {input_key}...")
 
         for item in tqdm(dataframe[input_key], desc=f"Implementing {self.refiner_name}"):
             modified = False
@@ -52,6 +53,6 @@ class RemoveEmojiRefiner(OperatorABC):
 
         dataframe[input_key] = refined_data
         storage.write(dataframe)
-        self.logger.info(f"Refining completed. Total items modified: {numbers}")
+        self.logger.info(f"Refining Complete. Total modified items: {numbers}")
 
         return [input_key]

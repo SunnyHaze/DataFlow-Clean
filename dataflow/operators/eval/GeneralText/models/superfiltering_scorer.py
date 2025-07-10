@@ -13,29 +13,27 @@ import pandas as pd
 @OPERATOR_REGISTRY.register()
 class SuperfilteringScorer(OperatorABC):
     def __init__(self, device='cuda', model_cache_dir='./dataflow_cache', max_length=512):
+        self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.device = device
         self.model_name = 'gpt2'
         self.model_cache_dir = model_cache_dir
         self.max_length = max_length
-        self.logger = get_logger()
-        self.logger.info(f"Using local model: {self.model_name}")
-    
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_name, 
+            device_map=self.device, 
+            cache_dir=self.model_cache_dir, 
+            output_hidden_states=True
+        ).to(self.device)
+        self.score_name = 'SuperfilteringScore'
+        self.logger.info(f'{self.__class__.__name__} initialized.')
+
     @staticmethod
     def get_desc(lang: str = "zh"):
         return "使用Superfiltering评分器评估指令质量" if lang == "zh" else "Evaluate instruction quality using the Superfiltering scorer."
 
     def inference(self, instruction, input_text, output):
-        """
-        根据use_API标志决定使用API或本地模型进行推理
-        
-        Args:
-            instruction: 指令文本
-            input_text: 输入文本
-            output: 输出文本
-            
-        Returns:
-            超滤得分(superfiltering score)
-        """
         PROMPT_DICT_NONE = {
             "prompt_input": (
                 "{instruction}\n{input}\n"
@@ -89,31 +87,17 @@ class SuperfilteringScorer(OperatorABC):
             
         return score
     
-    def eval(self, dataframe: pd.DataFrame, input_instruction_key: str = 'instruction', input_input_key: str = 'input', input_output_key: str = 'output'):
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name, 
-            device_map=self.device, 
-            cache_dir=self.model_cache_dir, 
-            output_hidden_states=True
-        ).to(self.device)
-       
+    def eval(self, dataframe: pd.DataFrame, input_instruction_key: str = 'instruction', input_input_key: str = None, input_output_key: str = 'output'):
+        self.logger.info(f"Evaluating {self.score_name}...")
         key_list = [input_instruction_key, input_output_key]
         if input_input_key is not None:
             key_list.append(input_input_key)
         scores = [self._score_func(sample, input_instruction_key, input_input_key, input_output_key) for sample in tqdm(dataframe[key_list].to_dict(orient='records'), desc="SuperfilteringScorer evaluating...")]
-        del self.tokenizer
-        del self.model
-        import gc;
-        gc.collect()
-        torch.cuda.empty_cache()
+        self.logger.info("Evaluation complete!")
         return scores
     
-    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', input_input_key: str = 'input', input_output_key: str = 'output', output_key: str = 'superfiltering_score'):
-        """Read the dataframe, evaluate scores, and store the results."""
-        dataframe = storage.read("dataframe")  # Read the dataframe from storage
-        scores = self.eval(dataframe, input_instruction_key, input_input_key, input_output_key)  # Evaluate the scores
-                
+    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', input_input_key: str = None, input_output_key: str = 'output', output_key: str = 'SuperfilteringScore'):
+        dataframe = storage.read("dataframe") 
+        scores = self.eval(dataframe, input_instruction_key, input_input_key, input_output_key)
         dataframe[output_key] = scores
-
-        storage.write(dataframe)  # Write the updated dataframe back to storage
+        storage.write(dataframe) 

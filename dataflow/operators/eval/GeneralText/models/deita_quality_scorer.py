@@ -11,16 +11,19 @@ from tqdm import tqdm
 
 @OPERATOR_REGISTRY.register()
 class DeitaQualityScorer(OperatorABC):
-    def __init__(self, device='cuda', model_cache_dir='', max_length=512):
+    def __init__(self, device='cuda', model_cache_dir='./dataflow_cache', max_length=512):
+        self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_name = 'hkust-nlp/deita-quality-scorer'
         self.model_cache_dir = model_cache_dir
         self.max_length = max_length
-        self.logger = get_logger()
-        self.logger.info(f"Using local model: {self.model_name}")
-        # Define token strings for quality scoring
         self.token_strs = ["1", "2", "3", "4", "5", "6"]
         self.score_template = np.array([1, 2, 3, 4, 5, 6])
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, cache_dir=self.model_cache_dir).to(self.device)
+        self.score_name = 'DeitaQualityScore'
+        self.logger.info(f'{self.__class__.__name__} initialized.')
 
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -57,26 +60,16 @@ class DeitaQualityScorer(OperatorABC):
         return final_score
 
     def eval(self, dataframe, input_instruction_key: str = 'instruction', input_output_key: str = 'output'):
-        # Evaluate the quality score for each row in the dataframe
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_name, cache_dir=self.model_cache_dir).to(self.device)
         scores = []
-        for sample in tqdm(dataframe[[input_instruction_key, input_output_key]].to_dict(orient='records'), desc="DeitaQualityScorer Evaluating..."):
+        self.logger.info(f"Evaluating {self.score_name}...")
+        for sample in tqdm(dataframe[[input_instruction_key, input_output_key]].to_dict(orient='records'), desc="Deita quality model Evaluating..."):
             quality_score = self.infer_quality(sample[input_instruction_key], sample[input_output_key])  # assuming response and instruction are the same for now
             scores.append(quality_score)
-        del self.tokenizer
-        del self.model
-        import gc;
-        gc.collect()
-        torch.cuda.empty_cache()
-        # Return as multiple columns
+        self.logger.info("Evaluation complete!")
         return scores
 
-    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', input_output_key: str = 'output', output_key: str = 'deita_quality_score'):
-        # Read the dataframe, evaluate scores, and store results
+    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', input_output_key: str = 'output', output_key: str = 'DeitaQualityScore'):
         dataframe = storage.read("dataframe")
         scores = self.eval(dataframe, input_instruction_key, input_output_key)
-        
-        # Flatten results and write them to output_key in the dataframe
         dataframe[output_key] = scores        
         storage.write(dataframe)

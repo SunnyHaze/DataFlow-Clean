@@ -5,9 +5,9 @@ recursive-include dataflow *.yaml
 recursive-include dataflow *.sh
 recursive-include dataflow *.txt
 
-# 包含配置文件夹内容（如果里面有yaml或json配置）
-recursive-include configs *.yaml
-recursive-include configs *.json
+# 包含样例文件夹下所有类型的文件
+# 样例文件夹路径为dataflow/exaple
+recursive-include dataflow/example */
 
 # 包含顶层文档文件
 include README.md

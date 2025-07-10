@@ -24,6 +24,7 @@ def extract_json_object(model_output):
 
 from transformers import AutoTokenizer  # 引入 tokenizer 库
 
+@OPERATOR_REGISTRY.register()
 class SupervisedFinetuneGenerator(OperatorABC):
     '''
     Answer Generator is a class that generates answers for given questions.

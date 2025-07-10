@@ -28,7 +28,7 @@ def test_all_operator_registry():
 if __name__ == "__main__":
     # 全局table，看所有注册的算子的str名称和对应的module路径
     print(OPERATOR_REGISTRY)
-
+    exit(0)
     # 获得所有算子的类名2class映射
     dataflow_obj_map = OPERATOR_REGISTRY.get_obj_map()
 

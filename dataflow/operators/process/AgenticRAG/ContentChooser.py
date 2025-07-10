@@ -5,12 +5,11 @@ import torch
 from torch import Tensor
 from typing import List, Optional
 import torch.nn.functional as F
-
 from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow import get_logger
 
 from dataflow.utils.storage import DataFlowStorage
-from dataflow.core import OperatorABC
+from dataflow.core import OperatorABC, LLMServingABC
 
 class KCenterGreedy:
     """Implements k-center-greedy method.
@@ -139,8 +138,10 @@ class KCenterGreedy:
 
 @OPERATOR_REGISTRY.register()
 class ContentChooser(OperatorABC):
-    def __init__(self, embedding_model_path: str):
-        self.embedding_model_path = embedding_model_path
+    def __init__(self, num_samples: int, method: str = "random", embedding_serving : LLMServingABC = None):
+        self.num_samples = num_samples
+        self.method = method
+        self.embedding_serving = embedding_serving
         self.logger = get_logger()
 
     @staticmethod
@@ -159,7 +160,7 @@ class ContentChooser(OperatorABC):
                 "This operator chooses document fragments for seed QA pairs.\n\n"
                 "Input Parameters:\n"
                 "- input_key: Field name containing the content\n"
-                "- embedding_model_path: Path to the embedding model\n"
+                "- embedding_serving: Embedding serving\n"
                 "- num_samples: Number of document fragments to select\n"
                 "- method: Selection method, random or k-center-greedy\n\n"
                 "Output Parameters:\n"
@@ -188,8 +189,6 @@ class ContentChooser(OperatorABC):
             self,
             storage:DataFlowStorage,
             input_key: str = "content",
-            num_samples: int = 1000,
-            method: str = "random"
             ) -> list:
         '''
         Execute the answer format filter process
@@ -201,26 +200,16 @@ class ContentChooser(OperatorABC):
         texts = dataframe[self.input_key].tolist()
         indexes =  np.zeros(len(dataframe)).astype(int)
         
-        if method == "random":
-            chooss_indexes = random.sample(range(len(texts)), num_samples)
-        elif method == "kcenter":
-            model_name = self.embedding_model_path
-
-            from vllm import LLM
-            model = LLM(
-                model=model_name,
-                enforce_eager=True,
-                device="cuda"
-            )
-            # Generate embedding. The output is a list of EmbeddingRequestOutputs.
-            outputs = model.embed(texts)
-            embeddings_list = [output.outputs.embedding for output in outputs]
+        if self.method == "random":
+            chooss_indexes = random.sample(range(len(texts)), self.num_samples)
+        elif self.method == "kcenter":
+            embeddings_list = self.embedding_serving.generate_embedding_from_input(texts)
             embeddings = torch.tensor(embeddings_list)
 
-            sampler = KCenterGreedy(embedding=embeddings, sampling_ratio= num_samples / len(texts))
+            sampler = KCenterGreedy(embedding=embeddings, sampling_ratio= self.num_samples / len(texts))
             chooss_indexes = sampler.select_coreset_idxs()
         else:
-            raise ValueError(f"Invalid method: {method}")
+            raise ValueError(f"Invalid method: {self.method}")
 
         for index in chooss_indexes:
             indexes[index] = 1

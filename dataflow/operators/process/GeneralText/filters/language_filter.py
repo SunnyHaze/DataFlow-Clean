@@ -13,7 +13,7 @@ class LanguageFilter(OperatorABC):
     def __init__(self, allowed_languages: list, model_cache_dir: str = None):
         self.logger = get_logger()
         self.filter_name = 'LanguageFilter'
-        self.logger.info(f"Initializing {self.filter_name}...")
+        self.logger.info(f"Initializing {self.__class__.__name__} with allowed_languages = {allowed_languages} and model_cache_dir = {model_cache_dir}...")
         
         self.allowed_languages = allowed_languages
         self.model_cache_dir = model_cache_dir
@@ -52,7 +52,7 @@ class LanguageFilter(OperatorABC):
         self.input_key = input_key
         self.output_key = output_key
         dataframe = storage.read("dataframe")
-        self.logger.info(f"Running {self.filter_name}...")
+        self.logger.info(f"Running {self.filter_name} with input_key = {self.input_key} and output_key = {self.output_key}...")
         predictions = self.eval(dataframe, self.input_key)
         dataframe[self.output_key] = predictions
         filtered_dataframe = dataframe[dataframe[self.output_key] == 1]

@@ -19,26 +19,21 @@ class InstagFilter(OperatorABC):
             device=device,
             max_new_tokens=max_new_tokens
         )
-        self.logger.info(f"Initializing {self.__class__.__name__} with min_score={self.min_score} and max_score={self.max_score}...")
+        self.logger.info(f"Initializing {self.__class__.__name__} with min_score = {self.min_score} and max_score = {self.max_score}...")
 
     @staticmethod
     def get_desc(lang: str = "zh"):
         return "使用Instag评分器过滤掉低标签数量数据" if lang == "zh" else "Filter out data with low tag counts using the Instag scorer."
 
-    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', output_key: str = 'instag_filter_label'):
+    def run(self, storage: DataFlowStorage, input_instruction_key: str = 'instruction', output_key: str = 'InstagScore'):
         self.input_instruction_key = input_instruction_key
         self.output_key = output_key
         dataframe = storage.read("dataframe")
         self.logger.info(f"Running {self.__class__.__name__}...")
 
-        # Get the metric scores
         scores = self.scorer.eval(dataframe, self.input_instruction_key)
-
         dataframe[self.output_key] = scores
-        # Filter records based on the score range
         filtered_dataframe = dataframe[(dataframe[self.output_key] >= self.min_score) & (dataframe[self.output_key] <= self.max_score)]
-
-        # Write the filtered dataframe back to storage
         storage.write(filtered_dataframe)
 
         self.logger.info(f"Filtering completed. Total records passing filter: {len(filtered_dataframe)}.")

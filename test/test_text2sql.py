@@ -1,6 +1,6 @@
 from dataflow.operators.generate.Text2SQL import *
 from dataflow.utils.storage import FileStorage
-from dataflow.llmserving import APILLMServing_request
+from dataflow.serving import APILLMServing_request
 
 
 class Text2SQLPipeline():

@@ -8,7 +8,7 @@ from dataflow.operators.process.AgenticRAG import (
     ContentChooser,
 )
 from dataflow.utils.storage import FileStorage
-from dataflow.llmserving import APILLMServing_request
+from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
 
 class AgenticRAGPipeline():
     def __init__(self, llm_serving=None):
@@ -28,8 +28,10 @@ class AgenticRAGPipeline():
         else:
             api_llm_serving = llm_serving
 
-        self.content_chooser_step1 = ContentChooser(embedding_model_path="/mnt/public/data/lh/models/hub/gte-Qwen2-7B-instruct")
+        embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="/mnt/public/data/lh/models/hub/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
 
+        self.content_chooser_step1 = ContentChooser(num_samples=5, method="kcenter", embedding_serving=embedding_serving)
+    
         self.prompt_generator_step2 = AutoPromptGenerator(api_llm_serving)
 
         self.qa_generator_step3 = QAGenerator(api_llm_serving)
@@ -41,9 +43,7 @@ class AgenticRAGPipeline():
 
         self.content_chooser_step1.run(
             storage = self.storage.step(),
-            input_key= "text",
-            num_samples=5,
-            method= "random"
+            input_key= "text"
         )
 
         self.prompt_generator_step2.run(

@@ -11,7 +11,10 @@ class NgramScorer(OperatorABC):
     
     def __init__(self, ngrams=5):
         self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.ngrams = ngrams
+        self.score_name = 'NgramScore'
+        self.logger.info(f'{self.__class__.__name__} initialized.')
     
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -32,14 +35,15 @@ class NgramScorer(OperatorABC):
         return repetition_score
 
     def eval(self, dataframe: pd.DataFrame, input_key: str):
+        self.logger.info(f"Evaluating {self.score_name}...")
         scores = [self._score_func(sample) for sample in tqdm(dataframe[input_key], desc="NgramScorer Evaluating...")]
+        self.logger.info("Evaluation complete!")
         return scores
     
-    def run(self, storage: DataFlowStorage, input_key: str, output_key: str):
+    def run(self, storage: DataFlowStorage, input_key: str, output_key: str='NgramScore'):
         self.input_key = input_key
         self.output_key = output_key
         dataframe = storage.read("dataframe")
-        self.logger.info(f"NgramScore ready to evaluate, ")
         scores = self.eval(dataframe, input_key)
         dataframe[self.output_key] = scores
         storage.write(dataframe)

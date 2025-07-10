@@ -1,30 +1,24 @@
 import torch
 from torch import nn
 from transformers import BertModel, BertConfig, PreTrainedModel, AutoTokenizer
-import requests
-import numpy as np
 from dataflow.core import OperatorABC
 from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow.utils.storage import DataFlowStorage
 from tqdm import tqdm
-import json
 from dataflow.utils.utils import get_logger
-import os
 
 @OPERATOR_REGISTRY.register()
 class PairQualScorer(OperatorABC):
-    def __init__(self, model_cache_dir:str=None, device="cuda", lang='en', max_length=512):
+    def __init__(self, model_cache_dir:str='./dataflow_cache', device="cuda", lang='en', max_length=512):
+        self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_cache_dir = model_cache_dir
         self.lang = lang
         self.max_length = max_length
-        self.logger = get_logger()
-
-
-        self.logger.info(f"Initializing model")
+        self.score_name = 'PairQualScore'
         if lang not in ['en', 'zh']:
             raise ValueError("Invalid value for 'lang'. Only 'en' or 'zh' are allowed.")
-
         if self.lang == 'en':
             model = "zks2856/PairQual-Scorer-en"
             config = BertConfig.from_pretrained(model, cache_dir=self.model_cache_dir)
@@ -35,7 +29,7 @@ class PairQualScorer(OperatorABC):
             config = BertConfig.from_pretrained(model, cache_dir=self.model_cache_dir)
             self.model = BertForRegression_zh.from_pretrained(model, config=config, trust_remote_code=True, cache_dir=self.model_cache_dir).to(self.device).eval()
             self.tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True, cache_dir=self.model_cache_dir)
-
+        self.logger.info(f'{self.__class__.__name__} initialized.')
 
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -48,15 +42,15 @@ class PairQualScorer(OperatorABC):
         return score.item()
 
     def eval(self, dataframe, input_key):
-        """批量评估"""
+        self.logger.info(f"Evaluating {self.score_name}...")
         scores = []
         for sample in tqdm(dataframe[input_key], desc="PairQualScorer Evaluating..."):
             score = self.inference(sample)
             scores.append(score)
-        return scores
+        self.logger.info("Evaluation complete!")
+        return np.array(scores)
 
-    def run(self, storage: DataFlowStorage, input_key: str, output_key: str):
-        """读取数据并运行评分"""
+    def run(self, storage: DataFlowStorage, input_key: str, output_key: str='PairQualScore'):
         dataframe = storage.read("dataframe")
         scores = self.eval(dataframe, input_key)
         dataframe[output_key] = scores

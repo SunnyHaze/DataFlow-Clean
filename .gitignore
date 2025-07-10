@@ -17,7 +17,7 @@ cache
 cache_local
 .cache
 dataflow_cache/
-
+dataflow/operators/eval/GeneralText/gen/cider/coco-val-df.p
 test_mineru
 test/test_cli
 

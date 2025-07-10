@@ -20,29 +20,19 @@ class QuratingFilter(OperatorABC):
                                      num_workers=num_workers, device_batch_size=device_batch_size, device=device, 
                                      labels=labels, model_cache_dir=model_cache_dir)
         
-        self.filter_name = 'QuratingFilter'
-        self.logger.info(f"Initializing {self.filter_name} with min_scores={self.min_scores} and max_scores={self.max_scores}...")
+        self.logger.info(f"Initializing {self.__class__.__name__} with min_scores = {self.min_scores} and max_scores = {self.max_scores}...")
 
     @staticmethod
     def get_desc(lang: str = "zh"):
         return "使用Qurating评分器过滤掉低质量数据" if lang == "zh" else "Filter out low-quality data using the Qurating scorer."
 
-    def eval(self, dataframe, input_key):
-        self.logger.info(f"Start evaluating {self.filter_name}...")
-        
-        # Get the scores using the scorer
-        scores = self.scorer.eval(dataframe, input_key)
-
-        # Return the scores for filtering
-        return scores
-
-    def run(self, storage: DataFlowStorage, input_key: str, output_key: str=None):
+    def run(self, storage: DataFlowStorage, input_key: str):
         self.input_key = input_key
         dataframe = storage.read("dataframe")
         self.logger.info(f"Running {self.filter_name}...")
 
         # Get the scores for filtering
-        scores = self.eval(dataframe, self.input_key)
+        scores = self.scorer.eval(dataframe, self.input_key)
 
         # Initialize results to all valid (1)
         results = np.ones(len(dataframe), dtype=int)

@@ -14,7 +14,7 @@ from dataflow.operators.process.Reasoning import (
     AnswerNgramFilter, 
 )
 from dataflow.utils.storage import FileStorage
-from dataflow.llmserving import APILLMServing_request, LocalModelLLMServing
+from dataflow.serving import LocalModelLLMServing_vllm
 
 class ReasoningPipeline():
     def __init__(self):
@@ -26,11 +26,10 @@ class ReasoningPipeline():
             cache_type="jsonl",
         )
 
-        llm_serving = LocalModelLLMServing(
-            model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
-            tensor_parallel_size=1,
-            max_tokens=8192,
-            model_source="local"
+        llm_serving = LocalModelLLMServing_vllm(
+            hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
+            vllm_tensor_parallel_size=1,
+            vllm_max_tokens=8192,
         )
 
         self.question_filter_step1 = QuestionFilter(

@@ -91,9 +91,12 @@ def hdd(word_array, sample_size=42.0):
 
 @OPERATOR_REGISTRY.register()
 class LexicalDiversityScorer(OperatorABC):
-    def __init__(self, metrics_to_keep=None):
+    def __init__(self):
         self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.metrics_to_keep = {'mtld': True, 'hdd': True}
+        self.score_name = 'LexicalDiversityScore'
+        self.logger.info(f'{self.__class__.__name__} initialized.')
     
     @staticmethod
     def get_desc(lang: str = "zh"):
@@ -102,9 +105,8 @@ class LexicalDiversityScorer(OperatorABC):
     def _score_func(self, sample):
         text = sample
         words = text.split()
-
         scores = {}
-
+        # must ensure text length in the given interval
         if self.metrics_to_keep.get('mtld'):
             if len(words) > 50:
                 scores['LexicalDiversityMTLDScore'] = mtld(words)
@@ -121,9 +123,11 @@ class LexicalDiversityScorer(OperatorABC):
 
     def eval(self, dataframe, input_key):
         scores_list = []
+        self.logger.info(f"Evaluating {self.score_name}...")
         for sample in tqdm(dataframe[input_key], desc="LexicalDiversityScorer Evaluating..."):
             scores = self._score_func(sample)
             scores_list.append(scores)
+        self.logger.info("Evaluation complete!")
         return scores_list
     
     def run(self, storage: DataFlowStorage, input_key: str):

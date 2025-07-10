@@ -45,7 +45,6 @@ def get_perplexity_and_embedding_part_text(tokenizer, model, text, target_span, 
             outputs = model(input_ids, labels=labels)
 
         loss = outputs.loss
-        print(f'{loss=}')
         perplexity = torch.exp(loss)
 
         return perplexity.to('cpu').item(), loss.to('cpu').item()

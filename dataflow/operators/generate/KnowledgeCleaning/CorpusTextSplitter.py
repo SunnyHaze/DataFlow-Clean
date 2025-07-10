@@ -17,13 +17,19 @@ from dataflow.core import OperatorABC
 
 @OPERATOR_REGISTRY.register()
 class CorpusTextSplitter(OperatorABC):
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 chunk_size: int = 512,
+                 chunk_overlap: int = 50,
+                 split_method: str = "token",
+                 min_tokens_per_chunk: int = 100,
+                 tokenizer_name: str = "bert-base-uncased",
+                 ):
         # 必需参数检查
-        self.chunk_size = kwargs.get("chunk_size", 512)
-        self.chunk_overlap = kwargs.get("chunk_overlap", 50)
-        self.split_method = kwargs.get("split_method", "token")
-        self.min_tokens_per_chunk = kwargs.get("min_tokens_per_chunk", 128)
-        tokenizer_name = kwargs.get("tokenizer_name", "bert-base-uncased")
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.split_method = split_method
+        self.min_tokens_per_chunk = min_tokens_per_chunk
+        tokenizer_name = tokenizer_name
         # 初始化tokenizer和chunker
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.chunker = self._initialize_chunker()

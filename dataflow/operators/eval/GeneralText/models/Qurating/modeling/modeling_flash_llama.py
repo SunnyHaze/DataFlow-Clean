@@ -44,7 +44,7 @@ def try_import_flash_attention():
             raise ImportError('Please install RoPE kernels: `pip install git+https://github.com/HazyResearch/flash-attention.git#subdirectory=csrc/rotary`')
         else:
             raise ImportError('Please install flash_attention dependency in GPU environment')
-
+from dataflow import get_logger
 
 logger = logging.get_logger(__name__)
 

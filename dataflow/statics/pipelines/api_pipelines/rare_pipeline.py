@@ -4,7 +4,7 @@ from dataflow.operators.generate.RARE import (
     ReasonDistill,
 )
 from dataflow.utils.storage import FileStorage
-from dataflow.llmserving import APILLMServing_request, LocalModelLLMServing
+from dataflow.serving import APILLMServing_request
 
 class RAREPipeline():
     def __init__(self):

@@ -10,20 +10,20 @@ from tqdm import tqdm
 class LangkitScorer(OperatorABC):
     def __init__(self):
         self.logger = get_logger()
+        self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.llm_schema = light_metrics.init()
+        self.score_name = 'LangkitScore'
+        self.logger.info(f'{self.__class__.__name__} initialized.')
 
     @staticmethod
     def get_desc(lang: str = "zh"):
         return "使用Langkit评分器评估文本质量" if lang == "zh" else "Evaluate text quality using the Langkit scorer."
 
     def _score_func(self, sample):
-        # Process the sample using langkit
         df = pd.DataFrame({'prompt': [sample]})
         df['response'] = ''  
         enhanced_df = extract(df, schema=self.llm_schema)
         scores_dict = enhanced_df.to_dict(orient='records')[0]
-
-        # Process the results to match the scoring format
         processed_scores = {}
         for k, v in scores_dict.items():
             if k == 'prompt':
@@ -33,11 +33,7 @@ class LangkitScorer(OperatorABC):
                 processed_scores[new_key] = v
             elif not (k == 'response' or k.startswith('response.')):
                 processed_scores[k] = v  
-
-        # Remove unwanted keys
         processed_scores.pop('has_patterns', None)
-
-        # Create final result dictionary
         result = {}
         for k, v in processed_scores.items():
             score_key = f"Langkit{''.join([word.capitalize() for word in k.split('_')])}Score"
@@ -47,18 +43,18 @@ class LangkitScorer(OperatorABC):
 
     def eval(self, dataframe, input_key):
         scores_list = []
+        self.logger.info(f"Evaluating {self.score_name}...")
         for sample in tqdm(dataframe[input_key], desc="LangkitScorer Evaluating..."):
             scores = self._score_func(sample)
             scores_list.append(scores)
+        self.logger.info("Evaluation complete!")
         return scores_list
     
     def run(self, storage: DataFlowStorage, input_key: str):
         self.input_key = input_key
         dataframe = storage.read("dataframe")
         self.logger.info("LangkitScore ready to evaluate.")
-        
         scores = self.eval(dataframe, input_key)
-        # Flatten the nested dictionary of scores into the dataframe
         for idx, score_dict in enumerate(scores):
             for key, value in score_dict.items():
                 dataframe.at[idx, key] = value

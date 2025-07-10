@@ -30,7 +30,7 @@ from dataflow.operators.refine.GeneralText import (
     RemoveExtraSpacesRefiner
 )
 from dataflow.operators.generate.GeneralText import PretrainGenerator
-from dataflow.llmserving import LocalModelLLMServing
+from dataflow.serving import LocalModelLLMServing
 from dataflow.utils.storage import FileStorage
 
 class PTTextSynPipeline():

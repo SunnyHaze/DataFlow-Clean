@@ -15,7 +15,8 @@ class MinHashDeduplicator(OperatorABC):
         self.threshold = threshold
         self.use_n_gram = use_n_gram
         self.n_gram = ngram
-    
+        self.logger.info(f"Initializing {self.__class__.__name__} with num_perm = {self.num_perm}, threshold = {self.threshold}, use_n_gram = {self.use_n_gram}, ngram = {self.n_gram}...")
+
     @staticmethod
     def get_desc(lang: str = "zh"):
         return "使用MinHash算法进行文本去重" if lang == "zh" else "Deduplicate text using the MinHash algorithm."
@@ -37,7 +38,10 @@ class MinHashDeduplicator(OperatorABC):
         if input_keys is not None and input_key is not None:
             self.logger.error(f"{self.__class__.__name__} only need one input args!")
             raise ValueError(f"{self.__class__.__name__} only need one input args!")
-        self.logger.info(f"Start running {self.__class__.__name__}...")
+        if input_keys is not None:
+            self.logger.info(f"Running {self.__class__.__name__} with input_keys = {input_keys} and output_key = {output_key}")
+        else:
+            self.logger.info(f"Running {self.__class__.__name__} with input_key = {input_key} and output_key = {output_key}")
         lsh = MinHashLSH(threshold=self.threshold, num_perm=self.num_perm)
         self.input_key = input_key
         self.input_keys = input_keys
