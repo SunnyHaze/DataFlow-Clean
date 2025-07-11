@@ -102,6 +102,7 @@ def generate_operator_py(
 
     # ---------- LLM-Serving 代码块 ----------
     if op_need_llm:
+        logger.debug("[op_need_llm]")
         if request.use_local_model:
             # 暂时不写，等确定的Serving
             llm_block = textwrap.dedent(
@@ -167,48 +168,42 @@ def generate_operator_py(
     )
 
     full_code = f"{original_code.rstrip()}\n\n{main_block}"
+    logger.debug("[full_code]")
 
     output_path = Path(request.py_path).expanduser().resolve()
     output_path.write_text(full_code, encoding="utf-8")
     return full_code
 
 def local_tool_for_get_match_operator_code(pre_task_result: Dict[str, Any]) -> str:
-    """
-    According to the names in `pre_task_result["match_operators"]`, look up the corresponding operator classes
-    in OPERATOR_REGISTRY, extract their full source code, and concatenate the results.
-
-    If an operator cannot be found or its source code cannot be retrieved, a comment will be added in the result.
-
-    Returns
-    -------
-    str
-        The source code text of all matched operators, separated by two newlines.
-    """
     if not pre_task_result or not isinstance(pre_task_result, dict):
         return "# ❗ pre_task_result is empty, cannot extract operator names"
+
     from dataflow.utils.registry import OPERATOR_REGISTRY
     _NAME2CLS = {name: cls for name, cls in OPERATOR_REGISTRY}
-    blocks: List[str] = []
+
+    blocks: list[str] = []
     for op_name in pre_task_result.get("match_operators", []):
         cls = _NAME2CLS.get(op_name)
         if cls is None:
             blocks.append(f"# --- {op_name} is not registered in OPERATOR_REGISTRY ---")
             continue
         try:
-            cls_src = inspect.getsource(cls)
+            cls_src    = inspect.getsource(cls)
             module_src = inspect.getsource(sys.modules[cls.__module__])
-            import_lines: list[str] = []
-            for line in module_src.splitlines():
-                if line.strip().startswith(("import ", "from ")):
-                    import_lines.append(line)
-                else:
-                    if import_lines:
-                        break
+
+            # ---------- 修正版：拿到所有 import ----------
+            import_lines = [
+                l for l in module_src.splitlines()
+                if l.strip().startswith(("import ", "from "))
+            ]
             import_block = "\n".join(import_lines)
+            # --------------------------------------------
+
             src_block = f"# === Source of {op_name} ===\n{import_block}\n\n{cls_src}"
             blocks.append(src_block)
         except (OSError, TypeError) as e:
             blocks.append(f"# --- Failed to get the source code of {op_name}: {e} ---")
+
     return "\n\n".join(blocks)
 
 def local_tool_for_debug_and_exe_operator(
@@ -219,10 +214,14 @@ def local_tool_for_debug_and_exe_operator(
     current_round: int = 0
 ):
     py_file = Path(request.py_path)
+    logger.info(f'[in local_tool_for_debug_and_exe_operator]:{request.py_path}')
     if not py_file.exists():
+        # logger.info('111111111111111111')
         raise FileNotFoundError(f"Operator file does not exist: {py_file}")
     else:
         code = generate_operator_py(request=request)
+        logger.info('[执行generate！！！]')
+    
     # if current_round == 0 and py_file.exists():
     #     code = generate_operator_py(request=request)
     #     logger.info(f"Reusing existing opetator file {request.py_path}")
