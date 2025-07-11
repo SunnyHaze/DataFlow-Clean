@@ -51,6 +51,7 @@ dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
 vllm = ["vllm<0.8"]
+kbc = ["vllm==0.6.3", "mineru[pipeline]==2.0.6"]
 myscale = ["clickhouse-driver"]
 sglang =["sglang[all]<=0.4.3"]
 litellm = ["litellm>=1.70.0,<2.0.0"]
