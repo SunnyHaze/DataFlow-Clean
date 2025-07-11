@@ -13,6 +13,13 @@ class LLMServingABC(ABC):
         """
         pass
     @abstractmethod
+    def generate_from_dialogue(self, dialogues: list[list[dict]]) -> list[str]:
+        """
+        Generate data from multi-turn dialogue.
+        dialogues: List[List[str]], the input of the generator
+        """
+        pass
+    @abstractmethod
     def cleanup(self):
         """
         Cleanup the generator and garbage collect all GPU/CPU memory.
