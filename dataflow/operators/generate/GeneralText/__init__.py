@@ -1,6 +1,6 @@
 from .PretrainGenerator import PretrainGenerator
 from .SupervisedFinetuneGenerator import SupervisedFinetuneGenerator
-from .PromptGenerator import PromptGenerator
+from .prompt_generator import PromptGenerator
 
 __all__ = [
     "PretrainGenerator",
