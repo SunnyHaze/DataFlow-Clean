@@ -11,7 +11,7 @@ def success(self, message, *args, **kwargs):
 
 logging.Logger.success = success  # 添加方法到 Logger 类
 
-def get_logger(level=logging.INFO) -> logging.Logger:
+def get_logger(level=logging.DEBUG) -> logging.Logger:
     # 创建logger对象
     logger = logging.getLogger("DataFlow")
     if not logger.handlers:

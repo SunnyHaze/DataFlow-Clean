@@ -84,7 +84,7 @@ if __name__ == "__main__":
         "py_path": f"{DATAFLOW_DIR}/test/operator_contentSum.py",
         "api_key": api_key,
         "chat_api_url": chat_api_url,
-        "execute_the_operator": True,
+        "execute_the_operator": False,
         "use_local_model": True,
         "local_model_name_or_path": "/mnt/public/model/huggingface/Qwen2.5-7B-Instruct",
         "timeout": 3600,
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "write":
         test_req = ChatAgentRequest(
             language="zh",
-            target="我需要一个算子，直接使用LLM内容摘要!",
+            target="我需要一个算子，直接使用llm_serving，实现语言翻译，把英文翻译成中文！",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
             ** operator_write_params
@@ -118,4 +118,4 @@ if __name__ == "__main__":
     # 我需要一个算子，能够对用户评论进行情感分析并输出积极/消极标签。
     # 我需要一个算子，能够计算文本的可读性分数并给出优化建议。
     # 我需要一个新的算子，这个算子可以使用MinHash算法进行文本去重!!
-    # 我需要一个算子，直接使用LLM实现语言翻译，把英文翻译成中文！
+    # 我需要一个算子，直接使用LLMServing实现语言翻译，把英文翻译成中文！

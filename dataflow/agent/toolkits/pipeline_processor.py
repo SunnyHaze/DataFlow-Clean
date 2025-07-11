@@ -17,7 +17,8 @@ It is designed for use in dynamic dataflow and AI workflow systems.
 
 Thread-safety: The module is stateless and thread-safe unless you modify global registry or perform concurrent writes to output files.
 """
-
+from dataflow.utils.registry import OPERATOR_REGISTRY
+OPERATOR_REGISTRY._get_all()
 import inspect
 import json
 from typing import List, Dict, Any, Type, Iterable, Tuple,Optional

@@ -35,6 +35,8 @@ Usage:
     result = local_tool_for_debug_and_exe_operator(request, dry_run=False)
 
 """
+from dataflow.utils.registry import OPERATOR_REGISTRY
+OPERATOR_REGISTRY._get_all()
 import importlib
 import inspect
 import os
@@ -63,6 +65,9 @@ def _find_first_operator(module) -> type:
     """
     from dataflow.core import OperatorABC
     from dataflow.utils.registry import OPERATOR_REGISTRY
+
+    _NAMECLS = {name: cls for name, cls in OPERATOR_REGISTRY}
+    logger.debug(f'[_NAMECLS]: {_NAMECLS}')
 
     for obj in module.__dict__.values():
         if inspect.isclass(obj) and issubclass(obj, OperatorABC) and obj is not OperatorABC:
@@ -198,7 +203,6 @@ def local_tool_for_get_match_operator_code(pre_task_result: Dict[str, Any]) -> s
             ]
             import_block = "\n".join(import_lines)
             # --------------------------------------------
-
             src_block = f"# === Source of {op_name} ===\n{import_block}\n\n{cls_src}"
             blocks.append(src_block)
         except (OSError, TypeError) as e:
