@@ -1,10 +1,10 @@
-from dataflow.operators.generate.AgenticRAG import (
+from dataflow.operators.generate import (
     AtomicTaskGenerator,
     DepthQAGenerator,
     WidthQAGenerator
 )
 
-from dataflow.operators.process.AgenticRAG import *
+from dataflow.operators.filter import *
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 from dataflow.core import LLMServingABC
@@ -37,6 +37,7 @@ class TaskCraftPipeline():
         
 
         ### Either use DepthQAGenerator or WidthQAGenerator
+        
         # self.task_step3 = WidthQAGenerator(
         #     llm_serving = llm_serving
         # )
