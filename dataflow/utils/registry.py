@@ -157,7 +157,7 @@ class Registry():
         """
         return self._obj_map
 
-OPERATOR_REGISTRY = Registry(name='operators', sub_modules=['eval', 'filter', 'generate', 'refine'])
+OPERATOR_REGISTRY = Registry(name='operators', sub_modules=['eval', 'filter', 'generate', 'refine', 'conversations'])
 class LazyLoader(types.ModuleType):
 
     def __init__(self, name, path, import_structure):
