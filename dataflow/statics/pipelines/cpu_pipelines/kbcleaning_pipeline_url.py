@@ -21,7 +21,7 @@ class KBCleaningPipeline():
         self.knowledge_cleaning_step2 = CorpusTextSplitter(
             split_method="token",
             chunk_size=512,
-            tokenizer_name="/data0/models/Qwen2.5-7B-Instruct",
+            tokenizer_name="Qwen/Qwen2.5-7B-Instruct",
         )
 
     def forward(self, url:str=None, raw_file:str=None):

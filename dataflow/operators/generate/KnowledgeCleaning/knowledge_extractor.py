@@ -171,7 +171,6 @@ class KnowledgeExtractor(OperatorABC):
         elif(raw_file_suffix in [".doc", ".docx", ".pptx", ".ppt"]):
             if(raw_file_suffix==".doc"):
                 raise Exception("Function Under Maintaining...Please transfer your file to pdf format first.")
-            # output_file=_parse_doc_to_md(raw_file, output_file)
         elif(raw_file_suffix in [".html", ".xml"]):
             output_file=_parse_xml_to_md(raw_file=raw_file,output_file=output_file)
         elif(raw_file_suffix in [".txt",".md"]):
