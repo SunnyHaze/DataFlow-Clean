@@ -347,6 +347,7 @@ def generate_pipeline_py(
         # -------- LLM Serving (Remote) --------
         llm_serving = APILLMServing_request(
             api_url="https://api.openai.com/v1/chat/completions",
+            key_name_of_api_key=''
             model_name="gpt-4o",
             max_workers=100,
         )

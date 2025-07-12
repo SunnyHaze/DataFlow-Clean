@@ -24,8 +24,8 @@ memorys = {
 }
 BASE_DIR = DataFlowPath.get_dataflow_dir()
 DATAFLOW_DIR = BASE_DIR.parent
-api_key = os.environ.get("CHATANY_API_KEY", "")
-chat_api_url = os.environ.get("CHATANY_API_URL", "")
+api_key = os.environ.get("DF_API_KEY", "")
+chat_api_url = os.environ.get("DF_API_URL", "")
 
 def _build_task_chain(req: ChatAgentRequest, tmpl:PromptsTemplateGenerator):
     router   = TaskRegistry.get("conversation_router", prompts_template=tmpl,request=req)
@@ -67,9 +67,9 @@ async def chatagent(req: ChatAgentRequest):
 
 if __name__ == "__main__":
     import uvicorn, json, sys, asyncio
-    pipeline_recommand_params = {
+    pipeline_recommend_params = {
         "json_file": f"{DATAFLOW_DIR}/dataflow/example/ReasoningPipeline/pipeline_math_short.json",
-        "py_path": f"{DATAFLOW_DIR}/test/recommend_pipeline_2.py",
+        "py_path": f"{DATAFLOW_DIR}/test/recommend_pipeline.py",
         "api_key": api_key,
         "chat_api_url": chat_api_url,
         "execute_the_pipeline": False,
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             target="帮我针对数据推荐一个的pipeline!!!不需要去重的算子 ！",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
-            **pipeline_recommand_params
+            **pipeline_recommend_params
         )
         resp = asyncio.run(_run_service(test_req))
         print(json.dumps(resp.dict(), ensure_ascii=False, indent=2))

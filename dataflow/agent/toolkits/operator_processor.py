@@ -67,7 +67,8 @@ def _find_first_operator(module) -> type:
     from dataflow.utils.registry import OPERATOR_REGISTRY
 
     _NAMECLS = {name: cls for name, cls in OPERATOR_REGISTRY}
-    logger.debug(f'[_NAMECLS]: {_NAMECLS}')
+    # logger.info(f'[_NAMECLS]: {_NAMECLS}')
+    logger.debug(OPERATOR_REGISTRY)
 
     for obj in module.__dict__.values():
         if inspect.isclass(obj) and issubclass(obj, OperatorABC) and obj is not OperatorABC:
@@ -136,6 +137,7 @@ def generate_operator_py(
                 # -------- LLM Serving (Remote) --------
                 llm_serving = APILLMServing_request(
                     api_url="https://api.openai.com/v1/chat/completions",
+                    key_name_of_api_key = ''
                     model_name="gpt-4o",
                     max_workers=100,
                 )
@@ -195,8 +197,6 @@ def local_tool_for_get_match_operator_code(pre_task_result: Dict[str, Any]) -> s
         try:
             cls_src    = inspect.getsource(cls)
             module_src = inspect.getsource(sys.modules[cls.__module__])
-
-            # ---------- 修正版：拿到所有 import ----------
             import_lines = [
                 l for l in module_src.splitlines()
                 if l.strip().startswith(("import ", "from "))
