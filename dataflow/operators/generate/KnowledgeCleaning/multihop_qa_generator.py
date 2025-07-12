@@ -396,7 +396,7 @@ class ExampleConstructor:
         """
         qa_pairs = []
         for response in responses:
-            self.logger.info(f"generated qa: {response}")
+            # self.logger.info(f"generated qa: {response}")
             
             # 方法1：尝试直接解析整个响应为JSON
             try:
