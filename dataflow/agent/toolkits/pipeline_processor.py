@@ -346,8 +346,8 @@ def generate_pipeline_py(
         llm_block = f"""
         # -------- LLM Serving (Remote) --------
         llm_serving = APILLMServing_request(
-            api_url="https://api.openai.com/v1/chat/completions",
-            key_name_of_api_key=''
+            api_url="http://123.129.219.111:3000/v1/chat/completions",
+            key_name_of_api_key='DF_API_KEY',
             model_name="gpt-4o",
             max_workers=100,
         )
@@ -420,7 +420,22 @@ def local_tool_for_execute_the_recommended_pipeline(
     py_file = Path(request.py_path)
     if is_in_debug_process and py_file.exists():
         code = py_file.read_text(encoding="utf-8")
-        logger.info(f"Reusing existing pipeline file {request.py_path}")
+        if 'if __name__ == "__main__":' not in code:
+            main_block = textwrap.dedent(
+                """
+                if __name__ == "__main__":
+                    pipeline = RecommendPipeline()
+                    pipeline.forward()
+                """
+            )
+            with py_file.open("a", encoding="utf-8") as f:
+                f.write(main_block)
+            code += main_block
+            logger.info(
+                "Main entrance not found. Appended the standard "
+                '"if __name__ == \'__main__\':" block to the existing file.'
+            )
+        logger.info(f"[Reusing existing pipeline file] {request.py_path}")
     else:
         code = generate_pipeline_py(
             pre_task_result,
@@ -434,9 +449,11 @@ def local_tool_for_execute_the_recommended_pipeline(
         import subprocess, sys
         logger.info("\n[............Pipeline is running............]\n")
         run_res = subprocess.run(
-            [sys.executable, request.py_path],
-            capture_output=True,
+            [sys.executable, "-u", str(py_file)],  
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,              
             text=True,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
         if run_res.returncode != 0:
             raise RuntimeError(
