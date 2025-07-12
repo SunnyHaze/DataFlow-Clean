@@ -67,7 +67,6 @@ class CorpusTextSplitter(OperatorABC):
         elif self.split_method == "semantic":
             return SemanticChunker(
                 chunk_size=self.chunk_size,
-                chunk_overlap=self.chunk_overlap
             )
         elif self.split_method == "recursive":
             return RecursiveChunker(
