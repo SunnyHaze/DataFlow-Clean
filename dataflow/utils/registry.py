@@ -13,7 +13,7 @@ import ast
 from pathlib import Path
 
 def generate_import_structure_from_type_checking(source_file: str, base_path: str) -> dict:
-    source = Path(source_file).read_text()
+    source = Path(source_file).read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     import_structure = {}
@@ -25,7 +25,7 @@ def generate_import_structure_from_type_checking(source_file: str, base_path: st
                     module_rel = subnode.module.replace(".", "/")
                     for alias in subnode.names:
                         name = alias.name
-                        module_file = f"{base_path}{module_rel}.py"
+                        module_file = str(Path(base_path) / f"{module_rel}.py")
                         import_structure[name] = (module_file, name)
 
     return import_structure
@@ -157,7 +157,7 @@ class Registry():
         """
         return self._obj_map
 
-OPERATOR_REGISTRY = Registry(name='operators', sub_modules=['eval', 'filter', 'generate', 'refine'])
+OPERATOR_REGISTRY = Registry(name='operators', sub_modules=['eval', 'filter', 'generate', 'refine', 'conversations'])
 class LazyLoader(types.ModuleType):
 
     def __init__(self, name, path, import_structure):
