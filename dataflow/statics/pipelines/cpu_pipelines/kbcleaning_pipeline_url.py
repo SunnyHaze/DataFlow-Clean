@@ -1,4 +1,4 @@
-from dataflow.operators.generate.KnowledgeCleaning import (
+from dataflow.operators.generate import (
     CorpusTextSplitter,
     KnowledgeExtractor,
 )
