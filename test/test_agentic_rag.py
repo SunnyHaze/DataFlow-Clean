@@ -1,10 +1,10 @@
-from dataflow.operators.generate.AgenticRAG import (
+from dataflow.operators.generate import (
     AutoPromptGenerator,
     QAGenerator,
     QAScorer
 )
 
-from dataflow.operators.process.AgenticRAG import (
+from dataflow.operators.filter import (
     ContentChooser,
 )
 from dataflow.utils.storage import FileStorage
@@ -28,7 +28,12 @@ class AgenticRAGPipeline():
         else:
             api_llm_serving = llm_serving
 
-        embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="/mnt/public/data/lh/models/hub/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
+        # embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="/mnt/public/data/lh/models/hub/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
+        embedding_serving = APILLMServing_request(
+                    api_url="http://123.129.219.111:3000/v1/embeddings",
+                    model_name="text-embedding-ada-002",
+                    max_workers=100
+        )
 
         self.content_chooser_step1 = ContentChooser(num_samples=5, method="kcenter", embedding_serving=embedding_serving)
     

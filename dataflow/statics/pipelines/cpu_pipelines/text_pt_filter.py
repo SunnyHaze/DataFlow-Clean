@@ -1,6 +1,5 @@
-from dataflow.operators.process.GeneralText import (
+from dataflow.operators.filter import (
     MinHashDeduplicator,
-    LanguageFilter,
     ColonEndFilter,
     WordNumberFilter,
     BlocklistFilter,
@@ -20,10 +19,9 @@ from dataflow.operators.process.GeneralText import (
     UniqueWordsFilter,
     CharNumberFilter,
     LineStartWithBulletpointFilter,
-    LineWithJavascriptFilter,
-    PairQualFilter
+    LineWithJavascriptFilter
 )
-from dataflow.operators.refine.GeneralText import (
+from dataflow.operators.refine import (
     HtmlUrlRemoverRefiner,
     RemoveEmojiRefiner,
     RemoveExtraSpacesRefiner
