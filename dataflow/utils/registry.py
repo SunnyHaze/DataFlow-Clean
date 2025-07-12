@@ -25,7 +25,7 @@ def generate_import_structure_from_type_checking(source_file: str, base_path: st
                     module_rel = subnode.module.replace(".", "/")
                     for alias in subnode.names:
                         name = alias.name
-                        module_file = f"{base_path}{module_rel}.py"
+                        module_file = str(Path(base_path) / f"{module_rel}.py")
                         import_structure[name] = (module_file, name)
 
     return import_structure
