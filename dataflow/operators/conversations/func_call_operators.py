@@ -323,6 +323,7 @@ class MultiTurnDialogueGenerator(OperatorABC):
                 break
         self.logger.info(f"Bad answer {np.where(np.array(completed_label) == 0)[0]}")
         dataframe[self.output_key] = cur_conversations
+        dataframe = dataframe[np.array(completed_label) == 1]
         storage.write(dataframe)
         return self.output_key
         
