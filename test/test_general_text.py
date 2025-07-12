@@ -13,10 +13,11 @@ class TextPipeline():
         )
         serving = APILLMServing_request(
             api_url="http://123.129.219.111:3000/v1/chat/completions",
-            model_name="gpt-4o"
+            model_name="gpt-4o",
+            max_workers=100
         )
         self.model_cache_dir = './dataflow_cache'
-        self.processor = ConsistentChatGenerator(llm_serving=serving, num_dialogs_per_intent=1)
+        self.processor = ConsistentChatGenerator(llm_serving=serving, num_dialogs_per_intent=350)
 
     def forward(self):
         self.processor.run(
