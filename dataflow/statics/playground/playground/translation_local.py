@@ -13,7 +13,7 @@ class Qwen_generator():
         self.model_cache_dir = './dataflow_cache'
         self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen2.5-7B-Instruct", # set to your own model path
-            vllm_tensor_parallel_size=4,
+            vllm_tensor_parallel_size=1,
             vllm_max_tokens=8192,
         )
         self.prompt_generator = PromptedGenerator(llm_serving = self.llm_serving, system_prompt = "Please solve this math problem.",)        
