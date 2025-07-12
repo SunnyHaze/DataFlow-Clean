@@ -3,7 +3,7 @@ from dataflow.serving import APILLMServing_request
 from dataflow.operators.conversations import (
     ScenarioExtractor,
     ScenarioExpander,
-    AtomicTaskGenerator,
+    AtomTaskGenerator,
     SequentialTaskGenerator,
     ParaSeqTaskGenerator,
     CompositionTaskFilter,
@@ -16,9 +16,9 @@ class FuncCallPipeline:
 
         self.storage = FileStorage(
             # first_entry_file_name="./dataflow/example/Dialogue/button_data.jsonl",
-            first_entry_file_name="./100_func_call_data.jsonl",
+            first_entry_file_name="part_9.json",
             cache_path="./cache",
-            file_name_prefix="dataflow_cache_step",
+            file_name_prefix="dataflow_cache_9000_step",
             cache_type="json",
         )
       
@@ -30,7 +30,7 @@ class FuncCallPipeline:
         
         self.scenario_extractor = ScenarioExtractor(llm_serving=self.llm_serving)
         self.scenario_expander = ScenarioExpander(llm_serving=self.llm_serving)
-        self.atom_task_generator = AtomicTaskGenerator(llm_serving=self.llm_serving)
+        self.atom_task_generator = AtomTaskGenerator(llm_serving=self.llm_serving)
         self.sequential_task_generator = SequentialTaskGenerator(llm_serving=self.llm_serving)
         self.parallel_sequential_stak_generator = ParaSeqTaskGenerator(llm_serving=self.llm_serving)
         self.composition_task_filter = CompositionTaskFilter(llm_serving=self.llm_serving)
