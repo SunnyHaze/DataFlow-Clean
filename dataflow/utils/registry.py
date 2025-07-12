@@ -13,7 +13,7 @@ import ast
 from pathlib import Path
 
 def generate_import_structure_from_type_checking(source_file: str, base_path: str) -> dict:
-    source = Path(source_file).read_text()
+    source = Path(source_file).read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     import_structure = {}
