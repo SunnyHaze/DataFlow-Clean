@@ -1,6 +1,5 @@
 from dataflow.operators.filter import (
     MinHashDeduplicator,
-    LanguageFilter,
     ColonEndFilter,
     WordNumberFilter,
     BlocklistFilter,
@@ -20,8 +19,7 @@ from dataflow.operators.filter import (
     UniqueWordsFilter,
     CharNumberFilter,
     LineStartWithBulletpointFilter,
-    LineWithJavascriptFilter,
-    PairQualFilter
+    LineWithJavascriptFilter
 )
 from dataflow.operators.refine import (
     HtmlUrlRemoverRefiner,
