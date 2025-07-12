@@ -885,6 +885,7 @@ class ExecutionAgent:
                 logger.info(f"[safe_call_tool] Script generated, switching to script debug mode: {py_file}")
                 code_src = py_file.read_text(encoding="utf-8")
                 is_debug_subprocess_code = True
+                logger.debug('[in ogger.info(f"[safe_call_tool] Script generated, switching to script debug mode: {py_file}")]')
 
             # ───────── 3. Call LLM to fix ─────────
             try:

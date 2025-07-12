@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import sys
 import types
 import os
 from dataflow.logger import get_logger
@@ -164,14 +165,16 @@ class LazyLoader(types.ModuleType):
         :return: 类对象
         """
         abs_file_path = os.path.join(self._base_folder, file_path)
+        mod_name      = f"{self.__name__}.{Path(file_path).stem}"
         if not os.path.exists(abs_file_path):
             raise FileNotFoundError(f"File {abs_file_path} does not exist")
         logger = get_logger()
         # 动态加载模块
         try:
-            spec = importlib.util.spec_from_file_location(class_name, abs_file_path)
+            spec = importlib.util.spec_from_file_location(mod_name, abs_file_path)
             logger.debug(f"LazyLoader {self.__path__} successfully imported spec {spec.__str__()}")
             module = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = module
             logger.debug(f"LazyLoader {self.__path__} successfully imported module {module.__str__()} from spec {spec.__str__()}")
             spec.loader.exec_module(module)
         except Exception as e:
