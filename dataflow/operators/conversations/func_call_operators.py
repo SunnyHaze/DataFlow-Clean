@@ -282,10 +282,13 @@ class MultiTurnDialogueGenerator(OperatorABC):
         dataframe[self.output_user_agent_response_key] = user_agent_responses
         turns = 0
         completed_label = [0] * len(dataframe)
+        valid_label = [0] * len(dataframe)
         cur_conversations = self._reformat_assistant_agent_prompt(user_agent_responses, dataframe)
         while True:
             assistant_agent_inputs = cur_conversations
-            cur_chatting_idxs = np.where(np.array(completed_label) == 0)[0]
+            not_completed_idxs = np.where(np.array(completed_label) == 0)[0]
+            valid_idxs = np.where(np.array(valid_label) == 0)[0]
+            cur_chatting_idxs = np.intersect1d(not_completed_idxs, valid_idxs)
             cur_chatting_conversations = [assistant_agent_inputs[idx] for idx in cur_chatting_idxs]
             assistant_agent_outputs = self.llm_serving.generate_from_conversations(cur_chatting_conversations)
             new_assistant_agent_outputs = list(zip(cur_chatting_idxs, assistant_agent_outputs))
@@ -294,6 +297,13 @@ class MultiTurnDialogueGenerator(OperatorABC):
             func_calls = []
             final_answer_pattern = r"<final>(.*?)</final>"
             for idx, text in new_assistant_agent_outputs:
+                if isinstance(text, str):
+                    final_match = re.search(final_answer_pattern, text, re.DOTALL)
+                else:
+                    print("Warning: 'text' is not a string:", text)
+                    final_match = None
+                    valid_label[idx] = 1
+                    continue
                 final_match = re.search(final_answer_pattern, text, re.DOTALL)
                 if final_match:
                     completed_label[idx] = 1
@@ -310,9 +320,9 @@ class MultiTurnDialogueGenerator(OperatorABC):
             for item, text in zip(cur_chatting_conversations, assistant_agent_outputs):
                 item.append({"role": "assistant", "content": text})
                 
-            cur_chatting_idxs = np.where(np.array(completed_label) == 0)[0]
-            if len(cur_chatting_idxs) == 0:
-                break
+            not_completed_idxs = np.where(np.array(completed_label) == 0)[0]
+            valid_idxs = np.where(np.array(valid_label) == 0)[0]
+            cur_chatting_idxs = np.intersect1d(not_completed_idxs, valid_idxs)
             cur_chatting_conversations = [assistant_agent_inputs[idx] for idx in cur_chatting_idxs]
             tool_agent_inputs = self._reformat_tool_agent_prompt(func_calls)
             tool_agent_outputs = self.llm_serving.generate_from_input(tool_agent_inputs)
