@@ -31,7 +31,7 @@ class AgenticRAGPipeline():
 
         # embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
         embedding_serving = APILLMServing_request(
-                    api_url="http://123.129.219.111:3000/v1/embeddings",
+                    api_url="https://api.openai.com/v1/embeddings",
                     model_name="text-embedding-ada-002",
                     max_workers=100
         )
