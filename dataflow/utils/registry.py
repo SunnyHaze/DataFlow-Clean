@@ -186,10 +186,20 @@ class LazyLoader(types.ModuleType):
         :param class_name: 类的名字
         :return: 类对象
         """
-        abs_file_path = os.path.join(self._base_folder, file_path)
-        mod_name      = f"{self.__name__}.{Path(file_path).stem}"
+        p = Path(file_path)
+        if p.is_absolute():
+            abs_file_path = str(p)
+        else:
+            abs_file_path = str(Path(self._base_folder) / p)
         if not os.path.exists(abs_file_path):
-            raise FileNotFoundError(f"File {abs_file_path} does not exist")
+            raise FileNotFoundError(abs_file_path)
+        rel_path = Path(abs_file_path).relative_to(self._base_folder)
+        # 去掉后缀得到 ('dataflow', 'operators', 'generate', ... , 'question_generator')
+        rel_parts = rel_path.with_suffix('').parts
+        prefix_parts = tuple(self.__name__.split('.'))
+        if rel_parts[:len(prefix_parts)] == prefix_parts:
+            rel_parts = rel_parts[len(prefix_parts):]
+        mod_name = '.'.join((*prefix_parts, *rel_parts))
         logger = get_logger()
         # 动态加载模块
         try:

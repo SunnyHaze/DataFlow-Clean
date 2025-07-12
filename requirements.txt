@@ -57,3 +57,4 @@ pyfiglet
 pyyaml
 requests
 termcolor
+uvicorn
