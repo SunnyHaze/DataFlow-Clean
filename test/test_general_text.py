@@ -23,5 +23,10 @@ class TextPipeline():
             storage=self.storage.step()
         )
 
-model = TextPipeline()
-model.forward()
+if __name__ == "__main__":
+    # This is a test entry point for the TextPipeline
+    # It will run the forward method of the TextPipeline class
+    # to process the data and generate the output.
+    print("Running TextPipeline...")
+    model = TextPipeline()
+    model.forward()
