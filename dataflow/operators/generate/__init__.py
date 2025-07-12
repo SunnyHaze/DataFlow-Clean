@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     # GeneralText
     from .GeneralText.pretrain_generator import PretrainGenerator
     from .GeneralText.sft_generator import SupervisedFinetuneGenerator
-    from .GeneralText.prompt_generator import PromptGenerator as GeneralText_PromptGenerator
+    from .GeneralText.prompted_generator import PromptedGenerator
 
     # Reasoning
     from .Reasoning.answer_generator import AnswerGenerator
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     # Text2SQL
     from .Text2SQL.DatabaseSchemaExtractor import DatabaseSchemaExtractor
     from .Text2SQL.ExtraKnowledgeGenerator import ExtraKnowledgeGenerator
-    from .Text2SQL.PromptGenerator import PromptGenerator as Text2SQL_PromptGenerator
+    from .Text2SQL.PromptGenerator import PromptGenerator
     from .Text2SQL.QuestionRefiner import QuestionRefiner
     from .Text2SQL.SchemaLinking import SchemaLinking
     from .Text2SQL.SQLDifficultyClassifier import SQLDifficultyClassifier
@@ -61,7 +61,7 @@ else:
         # GeneralText
         "PretrainGenerator": (cur_path + "GeneralText/pretrain_generator.py", "PretrainGenerator"),
         "SupervisedFinetuneGenerator": (cur_path + "GeneralText/sft_generator.py", "SupervisedFinetuneGenerator"),
-        "PromptGenerator": (cur_path + "GeneralText/prompt_generator.py", "PromptGenerator"),
+        "PromptedGenerator": (cur_path + "GeneralText/prompted_generator.py", "PromptedGenerator"),
         
         # Reasoning
         "AnswerGenerator": (cur_path + "Reasoning/answer_generator.py", "AnswerGenerator"),
