@@ -71,15 +71,15 @@ class AnswerNgramFilter(OperatorABC):
         self.answer_key = answer_key
         
         dataframe = storage.read("dataframe")
-        self.logger.info(f"Found {len(dataframe)} rows in the dataframe")
+        self.logger.info(f"Found {len(dataframe)} rows in the dataframe, DataFrame columns: {dataframe.columns}")
 
         scores = []
-        for sample in dataframe.itertuples(index=False):
+        for _, sample in dataframe.iterrows():
             try:
-                answer = getattr(sample, self.question_key)
-                answer += getattr(sample, self.answer_key, "")
-            except AttributeError:
-                answer = getattr(sample, self.question_key)
+                answer = sample.get(self.question_key, "") + sample.get(self.answer_key, "")
+            except Exception as e:
+                self.logger.error(f"Failed to get value for {self.question_key} or {self.answer_key}, {e}")
+                answer = sample.get(self.question_key, "")
 
             content = answer.lower()
             content = re.sub(r'[^\w\s]', '', content)
