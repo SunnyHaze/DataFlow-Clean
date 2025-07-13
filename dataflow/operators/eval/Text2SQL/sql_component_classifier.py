@@ -1,6 +1,5 @@
 from tqdm import tqdm
 from nltk import word_tokenize
-import os
 import pandas as pd
 import sqlite3
 import re
@@ -9,11 +8,7 @@ from dataflow import get_logger
 from dataflow.core import OperatorABC
 from dataflow.utils.storage import DataFlowStorage
 
-
 class Schema:
-    """
-    Simple schema which maps table&column to a unique identifier
-    """
     def __init__(self, schema):
         self._schema = self._normalize_schema(schema)
         self._idMap = self._map(self._schema)
@@ -45,9 +40,6 @@ class Schema:
     
 
 class EvalHardness:
-    """
-    Tokenize SQL query and parse SQL query
-    """
     CLAUSE_KEYWORDS = ('select', 'from', 'where', 'group', 'order', 'limit', 'intersect', 'union', 'except')
     JOIN_KEYWORDS = ('join', 'on', 'as')
 
@@ -103,7 +95,6 @@ class EvalHardness:
         return toks  
     
     def scan_alias(self, toks):
-        """Scan the index of 'as' and build the map for all alias"""
         as_idxs = [idx for idx, tok in enumerate(toks) if tok == 'as']
         alias = {}
         for idx in as_idxs:
@@ -118,9 +109,6 @@ class EvalHardness:
         return tables
     
     def parse_col(self, toks, start_idx, tables_with_alias, schema, default_tables=None):
-        """
-            :returns next idx, column id
-        """
         tok = toks[start_idx].strip().lower()
         if tok == "*":
             return start_idx + 1, schema.idMap[tok]
@@ -142,9 +130,6 @@ class EvalHardness:
 
 
     def parse_col_unit(self, toks, start_idx, tables_with_alias, schema, default_tables=None):
-        """
-            :returns next idx, (agg_op id, col_id)
-        """
         idx = start_idx
         if toks[idx] in self.FUNC_OPS:
             func_name = toks[idx]
@@ -200,7 +185,7 @@ class EvalHardness:
 
         if isBlock:
             assert toks[idx] == ')'
-            idx += 1  # skip ')'
+            idx += 1 
 
         return idx, (agg_id, col_id, isDistinct)
 
@@ -250,15 +235,12 @@ class EvalHardness:
 
         if isBlock:
             assert toks[idx] == ')'
-            idx += 1  # skip ')'
+            idx += 1
 
         return idx, (unit_op, col_unit1, col_unit2)
 
 
     def parse_table_unit(self, toks, start_idx, tables_with_alias, schema):
-        """
-            :returns next idx, table id, table name
-        """
         idx = start_idx
         len_ = len(toks)
         key = tables_with_alias[toks[idx]]
@@ -335,7 +317,7 @@ class EvalHardness:
 
             if idx < len_ and toks[idx] in self.COND_OPS:
                 conds.append(toks[idx])
-                idx += 1  # skip and/or
+                idx += 1
 
         return idx, conds
 
@@ -360,15 +342,12 @@ class EvalHardness:
             idx, val_unit = self.parse_val_unit(toks, idx, tables_with_alias, schema, default_tables)
             val_units.append((agg_id, val_unit))
             if idx < len_ and toks[idx] == ',':
-                idx += 1  # skip ','
+                idx += 1
 
         return idx, (isDistinct, val_units)
 
 
     def parse_from(self, toks, start_idx, tables_with_alias, schema):
-        """
-        Assume in the from clause, all table units are combined with join
-        """
         assert 'from' in toks[start_idx:], "'from' not found"
 
         len_ = len(toks)
@@ -388,12 +367,12 @@ class EvalHardness:
                 table_units.append((self.TABLE_TYPE['sql'], sql))
             else:
                 if idx < len_ and toks[idx] == 'join':
-                    idx += 1  # skip join
+                    idx += 1
                 idx, table_unit, table_name = self.parse_table_unit(toks, idx, tables_with_alias, schema)
                 table_units.append((self.TABLE_TYPE['table_unit'],table_unit))
                 default_tables.append(table_name)
             if idx < len_ and toks[idx] == "on":
-                idx += 1  # skip on
+                idx += 1
                 idx, this_conds = self.parse_condition(toks, idx, tables_with_alias, schema, default_tables)
                 if len(conds) > 0:
                     conds.append('and')
@@ -436,7 +415,7 @@ class EvalHardness:
             idx, col_unit = self.parse_col_unit(toks, idx, tables_with_alias, schema, default_tables)
             col_units.append(col_unit)
             if idx < len_ and toks[idx] == ',':
-                idx += 1  # skip ','
+                idx += 1
             else:
                 break
 
@@ -463,7 +442,7 @@ class EvalHardness:
                 order_type = toks[idx]
                 idx += 1
             if idx < len_ and toks[idx] == ',':
-                idx += 1  # skip ','
+                idx += 1
             else:
                 break
 
@@ -539,7 +518,7 @@ class EvalHardness:
         idx = self.skip_semicolon(toks, idx)
         if isBlock:
             assert toks[idx] == ')'
-            idx += 1  # skip ')'
+            idx += 1
         idx = self.skip_semicolon(toks, idx)
 
         # intersect/union/except clause
@@ -583,7 +562,7 @@ class EvalHardness:
             count += 1
         if sql['limit'] is not None:
             count += 1
-        if len(sql['from']['table_units']) > 0:  # JOIN
+        if len(sql['from']['table_units']) > 0:
             count += len(sql['from']['table_units']) - 1
 
         ao = sql['from']['conds'][1::2] + sql['where'][1::2] + sql['having'][1::2]
@@ -592,7 +571,6 @@ class EvalHardness:
         count += len([cond_unit for cond_unit in cond_units if cond_unit[1] == self.WHERE_OPS.index('like')])
 
         return count
-
 
     def count_component2(self, sql):
         nested = self.get_nestedSQL(sql)
@@ -651,14 +629,24 @@ class EvalHardness:
 
 
 class EvalHardnessLite:
-    def __init__(self, sql: str):
+    def __init__(self, sql: str, difficulty_config: dict):
         self.sql = sql.lower()
+        self.difficulty_config = difficulty_config
 
     def match(self, pattern):
         return bool(re.search(pattern, self.sql))
 
     def count_keyword(self, keyword):
         return self.sql.count(keyword)
+    
+    def classify_difficulty(self, score: int) -> str:
+        thresholds = self.difficulty_config['thresholds']
+        labels = self.difficulty_config['labels']
+        
+        for i, threshold in enumerate(thresholds):
+            if score <= threshold:
+                return labels[i]
+        return labels[-1]
 
     def run(self):
         sql = self.sql
@@ -696,62 +684,37 @@ class EvalHardnessLite:
         if any(op in sql for op in ['union', 'intersect', 'except']):
             score += 2
 
-        # 多列 SELECT
         select_cols = re.findall(r'select\s+(distinct\s+)?(.+?)\s+from', sql, re.DOTALL)
         if select_cols:
             num_commas = select_cols[0][1].count(',')
             if num_commas >= 1:
                 score += 1
 
-        # 简单规则分类
-        if score <= 2:
-            return 'easy'
-        elif score <= 4:
-            return 'medium'
-        elif score <= 6:
-            return 'hard'
-        else:
-            return 'extra'
+        difficulty = self.classify_difficulty(score)
+        return difficulty
 
 
 @OPERATOR_REGISTRY.register()
-class SQLDifficultyClassifier(OperatorABC):
-    def __init__(self, max_score: int = 2.0, min_score: int = 0.9):
-        self.max_score = max_score
-        self.min_score = min_score
-        self.logger = get_logger()
-
-    @staticmethod
-    def get_desc(lang: str = "zh"):
-        if lang == "zh":
-            return (
-                "该算子用于基于SQL中的关键词数量统计划分难度。\n\n"
-                "输入参数：\n"
-                "- input_sql_key：SQL key\n"
-                "- input_dbid_key：db_id key，数据库名\n\n"
-                "输出参数：\n"
-                "- output_key：SQL语句的难度标签"
-            )
-        elif lang == "en":
-            return (
-                "This operator classifies SQL difficulty based on the number of keywords in the SQL query.\n\n"
-                "Input parameters:\n"
-                "- input_sql_key: Key for the SQL query\n"
-                "- input_dbid_key: Key for the database ID, which is the database name\n\n"
-                "Output parameters:\n"
-                "- output_key: Difficulty label for the SQL query"
-            )
+class ComponentClassifier(OperatorABC):
+    def __init__(self, difficulty_config: dict | None = None):
+        if difficulty_config is None:
+            self.difficulty_config = {
+                'thresholds': [2, 5, 9],
+                'labels': ['easy', 'medium', 'hard', 'extra']
+            }
         else:
-            return "AnswerExtraction_qwenmatheval performs mathematical answer normalization and standardization."
+            self.difficulty_config = difficulty_config
+        self.logger = get_logger()
+        if len(self.difficulty_config['thresholds']) != len(self.difficulty_config['labels']) - 1:
+            raise ValueError("Thresholds and labels configuration mismatch")
+
+    def check_column(self, dataframe):
+        required_columns = [self.input_sql_key]
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
 
     def get_schema(self, db):
-        """
-        Get database's schema, which is a dict with table name as key
-        and list of column names as value
-        :param db: database path
-        :return: schema dict
-        """
-
         schema = {}
         conn = sqlite3.connect(db)
         cursor = conn.cursor()
@@ -766,9 +729,6 @@ class SQLDifficultyClassifier(OperatorABC):
         return schema    
     
     def report_statistics(self, dataframe: pd.DataFrame):
-        '''
-        print the statistics of the SQL difficulty.
-        '''
         counts = dataframe[self.output_difficulty_key].value_counts()
         self.logger.info("SQL Difficulty Statistics")
         difficulty_counts = {d: counts.get(d, 0) for d in ['easy', 'medium', 'hard', 'extra']}
@@ -781,10 +741,10 @@ class SQLDifficultyClassifier(OperatorABC):
         self.input_sql_key = input_sql_key
         self.output_difficulty_key = output_difficulty_key
         dataframe = storage.read("dataframe")
-        
+        self.check_column(dataframe)
         for idx, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Processing"):
             sql = row.get(self.input_sql_key)
-            sql_hardness = EvalHardnessLite(sql)
+            sql_hardness = EvalHardnessLite(sql, self.difficulty_config)
             hardness = sql_hardness.run()
             dataframe.at[idx, self.output_difficulty_key] = hardness
 
