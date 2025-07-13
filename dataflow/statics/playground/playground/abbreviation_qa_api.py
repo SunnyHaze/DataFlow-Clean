@@ -18,7 +18,7 @@ class GPT_generator():
         )
         self.prompt_generator = PromptedGenerator(
             llm_serving = self.llm_serving, 
-            system_prompt = "Please solve this math problem.", # System prompt for math problem solving
+            system_prompt = "Please rewrite the following paragraph into a concise summary that preserves the core meaning and key information:", # System prompt for math problem solving
         )
 
     def forward(self):
