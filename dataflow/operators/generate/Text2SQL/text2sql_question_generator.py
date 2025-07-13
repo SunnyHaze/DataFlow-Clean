@@ -1,27 +1,29 @@
 import json
-import os
 import random
-import sqlite3
 import re
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
 from scipy.spatial.distance import cdist
-from sentence_transformers import SentenceTransformer
 
 from dataflow.prompts.text2sql import QuestionGenerationPrompt
 from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow import get_logger
-from dataflow.core import OperatorABC
-from dataflow.core import LLMServingABC
+from dataflow.core import OperatorABC, LLMServingABC
 from dataflow.utils.storage import DataFlowStorage
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
 @OPERATOR_REGISTRY.register()
 class QuestionGeneration(OperatorABC):
-    def __init__(self, llm_serving: LLMServingABC, database_manager: DatabaseManager, question_candidates_num: int = 5):
+    def __init__(self, 
+                llm_serving: LLMServingABC, 
+                embedding_api_llm_serving: LLMServingABC, 
+                database_manager: DatabaseManager, 
+                question_candidates_num: int = 5):
+
         self.llm_serving = llm_serving
+        self.embedding_api_llm_serving = embedding_api_llm_serving
         self.database_manager = database_manager
         self.prompt = QuestionGenerationPrompt()
         self.logger = get_logger()
@@ -63,7 +65,7 @@ class QuestionGeneration(OperatorABC):
                 "external_knowledge": external_knowledge_content.strip()
             }
 
-    def select_best_question(self, question_candidates, embedding_model):
+    def select_best_question(self, question_candidates, start_idx, embeddings):
         if len(question_candidates) == 0:
             return None
         elif len(question_candidates) == 1:
@@ -71,10 +73,10 @@ class QuestionGeneration(OperatorABC):
         elif len(question_candidates) == 2:
             return random.sample(question_candidates, 1)[0]
         else:
-            texts = [question_info["external_knowledge"] + " " + question_info["question"] for question_info in question_candidates]
-            texts = [text.strip() for text in texts]
-            embeddings = embedding_model.encode(texts)
-            distance_matrix = cdist(embeddings, embeddings, metric='cosine')
+            end_idx = start_idx + len(question_candidates)
+            candidate_embeddings = embeddings[start_idx:end_idx]
+            
+            distance_matrix = cdist(candidate_embeddings, candidate_embeddings, metric='cosine')
             distance_sums = distance_matrix.sum(axis=1)
             min_index = np.argmin(distance_sums)
             return question_candidates[min_index]
@@ -89,7 +91,18 @@ class QuestionGeneration(OperatorABC):
         self.output_question_key = output_question_key
         
         raw_dataframe = storage.read("dataframe")
-        raw_data = [row for _, row in raw_dataframe.iterrows()]
+        
+        existing_data = []
+        raw_data = []
+        
+        if self.output_question_key in raw_dataframe.columns:
+            for idx, row in raw_dataframe.iterrows():
+                if pd.notna(row.get(self.output_question_key)) and row.get(self.output_question_key) is not None:
+                    existing_data.append(row.to_dict())
+                else:
+                    raw_data.append(row.to_dict())
+        else:
+            raw_data = [row.to_dict() for _, row in raw_dataframe.iterrows()]
         
         styles = ["Formal", "Colloquial", "Imperative", "Interrogative", "Descriptive", "Concise", "Vague", "Metaphorical"]
         db_ids = list(set([data[self.input_db_id_key] for data in raw_data]))
@@ -143,29 +156,69 @@ class QuestionGeneration(OperatorABC):
         
         self.logger.info("Parsing responses and organizing candidates...")
         grouped_responses = [responses[i:i+self.question_candidates_num] for i in range(0, len(responses), self.question_candidates_num)]
+
+        all_question_candidates = []
+        question_groups = [] 
+        embedding_texts = []
         
-        embedding_model = SentenceTransformer(model_name_or_path="sentence-transformers/all-mpnet-base-v2", device="cuda:0")
-        
-        results = []
         for data, response_group in zip(raw_data, grouped_responses):
             question_candidates = []
             for response in response_group:
                 parsed_response = self.parse_llm_response(response, data.get("style", "Formal"))
                 if parsed_response:
                     question_candidates.append(parsed_response)
+                    text = parsed_response["external_knowledge"] + " " + parsed_response["question"]
+                    embedding_texts.append(text.strip())
             
-            best_question = self.select_best_question(question_candidates, embedding_model)
-            
-            if best_question:
-                result = {
-                    **data,
-                    self.output_question_key: best_question["question"]
-                }
-                results.append(result)
-            else:
-                self.logger.warning(f"No valid question generated for data: {data[self.input_db_id_key]}")
-
-        output_file = storage.write(pd.DataFrame(results))
-        self.logger.info(f"Question generation results saved to {output_file}")
+            question_groups.append(question_candidates)
+            all_question_candidates.extend(question_candidates)
         
-        return [self.output_question_key]
+        self.logger.info("Generating embeddings for all question candidates...")
+        if embedding_texts:
+            embeddings = self.embedding_api_llm_serving.generate_embedding_from_input(embedding_texts)
+        else:
+            embeddings = []
+        
+        processed_results = []
+        failed_data = []
+        embedding_start_idx = 0
+        
+        for data, question_candidates in zip(raw_data, question_groups):
+            if question_candidates:
+                best_question = self.select_best_question(
+                    question_candidates, 
+                    embedding_start_idx, 
+                    embeddings
+                )
+                embedding_start_idx += len(question_candidates)
+                
+                if best_question:
+                    result = {
+                        **data,
+                        self.output_question_key: best_question["question"]
+                    }
+                    processed_results.append(result)
+                else:
+                    self.logger.warning(f"No valid question generated for data: {data[self.input_db_id_key]}")
+                    failed_data.append(data)
+            else:
+                self.logger.warning(f"No question candidates for data: {data[self.input_db_id_key]}")
+                failed_data.append(data)
+        
+        if self.output_question_key in raw_dataframe.columns:
+            all_results = existing_data + processed_results
+        else:
+            all_results = processed_results
+        
+        final_df = pd.DataFrame(all_results)
+        output_file = storage.write(final_df)
+        
+        self.logger.info(f"Question generation results saved to {output_file}")
+        self.logger.info(f"Successfully processed: {len(processed_results)}")
+        if failed_data:
+            self.logger.warning(f"Failed to generate questions for: {len(failed_data)} entries")
+        
+        if self.output_question_key in raw_dataframe.columns:
+            return []
+        else:
+            return [self.output_question_key]

@@ -13,7 +13,7 @@ from dataflow.operators.eval import (
     ExecutionClassifier
 )
 from dataflow.utils.storage import FileStorage
-from dataflow.serving import APILLMServing_request, LocalModelLLMServing
+from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
@@ -21,7 +21,7 @@ class Text2SQLPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
-            first_entry_file_name="/mnt/public/data/cqf/DataFlow/dataflow/example/Text2SQLPipeline/pipeline2.json",
+            first_entry_file_name="../example_data/ReasoningPipeline/pipeline_gen.json",
             cache_path="./cache_local",
             file_name_prefix="dataflow_cache_step",
             cache_type="jsonl"
@@ -42,7 +42,7 @@ class Text2SQLPipeline():
 
         embedding_api_llm_serving = APILLMServing_request(
             api_url="http://123.129.219.111:3000/v1/embeddings",
-            model_name="text-embedding-3-small",
+            model_name="text-embedding-ada-002",
             max_workers=100
         )
 
@@ -72,7 +72,7 @@ class Text2SQLPipeline():
 
         # A demo database is provided. Download it from the following URL and update the path:  
         # https://huggingface.co/datasets/Open-Dataflow/dataflow-Text2SQL-database-example  
-        db_root_path = "/mnt/public/data/cqf/DataFlow/dataflow/example/Text2SQLPipeline/dev_databases"  
+        db_root_path = ""  
 
         # SQLite and MySQL are currently supported
         # db_type can be sqlite or mysql, which must match your database type
@@ -106,6 +106,7 @@ class Text2SQLPipeline():
 
         self.text2sql_question_generator_step5 = QuestionGeneration(
             llm_serving=api_llm_serving,
+            embedding_api_llm_serving=embedding_api_llm_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )

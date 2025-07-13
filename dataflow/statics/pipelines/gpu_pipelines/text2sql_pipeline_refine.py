@@ -13,7 +13,7 @@ from dataflow.operators.eval import (
     ExecutionClassifier
 )
 from dataflow.utils.storage import FileStorage
-from dataflow.serving import APILLMServing_request, LocalModelLLMServing
+from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
@@ -21,30 +21,26 @@ class Text2SQLPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
-            first_entry_file_name="/mnt/public/data/cqf/DataFlow/dataflow/example/Text2SQLPipeline/pipeline2.json",
+            first_entry_file_name="../example_data/ReasoningPipeline/pipeline_gen.json",
             cache_path="./cache_local",
             file_name_prefix="dataflow_cache_step",
             cache_type="jsonl"
         )
 
-        api_llm_serving = APILLMServing_request(
-            api_url="http://123.129.219.111:3000/v1/chat/completions",
-            model_name="gpt-4o",
-            max_workers=100
+        llm_serving = LocalModelLLMServing_vllm(
+            hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
+            vllm_tensor_parallel_size=1,
+            vllm_max_tokens=8192,
         )
 
         # It is recommended to use better LLMs for the generation of Chain-of-Thought (CoT) reasoning process.
-        cot_generation_api_llm_serving = APILLMServing_request(
-            api_url="http://123.129.219.111:3000/v1/chat/completions",
-            model_name="gpt-4o", # You can change to a more powerful model for CoT generation
-            max_workers=100
+        cot_generation_llm_serving = LocalModelLLMServing_vllm(
+            hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
+            vllm_tensor_parallel_size=1,
+            vllm_max_tokens=8192,
         )
 
-        embedding_api_llm_serving = APILLMServing_request(
-            api_url="http://123.129.219.111:3000/v1/embeddings",
-            model_name="text-embedding-3-small",
-            max_workers=100
-        )
+        embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
 
         # You can customize the difficulty config here, but it must contain 'thresholds' and 'labels' keys
         execution_difficulty_config = {
@@ -72,7 +68,7 @@ class Text2SQLPipeline():
 
         # A demo database is provided. Download it from the following URL and update the path:  
         # https://huggingface.co/datasets/Open-Dataflow/dataflow-Text2SQL-database-example  
-        db_root_path = "/mnt/public/data/cqf/DataFlow/dataflow/example/Text2SQLPipeline/dev_databases"  
+        db_root_path = ""  
 
         # SQLite and MySQL are currently supported
         # db_type can be sqlite or mysql, which must match your database type
@@ -90,12 +86,12 @@ class Text2SQLPipeline():
         )
 
         self.sql_consistency_filter_step2 = ConsistencyFilter(
-            llm_serving=api_llm_serving,
+            llm_serving=llm_serving,
             database_manager=database_manager
         )
 
         self.sql_variation_generator_step3 = SQLVariationGenerator(
-            llm_serving=api_llm_serving,
+            llm_serving=llm_serving,
             database_manager=database_manager,
             num_variations=5
         )
@@ -105,7 +101,8 @@ class Text2SQLPipeline():
         )
 
         self.text2sql_question_generator_step5 = QuestionGeneration(
-            llm_serving=api_llm_serving,
+            llm_serving=llm_serving,
+            embedding_api_llm_serving=embedding_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )
@@ -117,7 +114,7 @@ class Text2SQLPipeline():
         )
 
         self.sql_cot_generator_step7 = CoTGenerator(
-            llm_serving=cot_generation_api_llm_serving,
+            llm_serving=cot_generation_llm_serving,
             database_manager=database_manager,
             schema_config=schema_config,
             max_retries=3,
@@ -129,7 +126,7 @@ class Text2SQLPipeline():
         )
 
         self.sql_execution_classifier_step9 = ExecutionClassifier(
-            llm_serving=api_llm_serving,
+            llm_serving=llm_serving,
             database_manager=database_manager,
             difficulty_config=execution_difficulty_config,
             num_generations=5
