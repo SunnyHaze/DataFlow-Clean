@@ -79,12 +79,16 @@ class AnalystAgent:
         self.task.task_result = self.robust_parse_json(content)
         logger.info(f"[parse results]:  {self.task.task_result}")
         return self.task.task_result
+    
     def _strip_json_comments(self, s: str) -> str:
         """
         Remove block and line comments, and trailing commas from JSON-like strings.
         """
+        # /*  ...  */
         s = re.sub(r'/\*.*?\*/', '', s, flags=re.DOTALL)
-        s = re.sub(r'//.*$', '', s, flags=re.MULTILINE)
+        # // ...   （仅限行首或前面只有空白）
+        s = re.sub(r'^\s*//.*$', '', s, flags=re.MULTILINE)
+        # 尾逗号  ,}
         s = re.sub(r',\s*([}\]])', r'\1', s)
         return s
 

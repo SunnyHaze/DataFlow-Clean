@@ -13,7 +13,7 @@ import ast
 from pathlib import Path
 
 def generate_import_structure_from_type_checking(source_file: str, base_path: str) -> dict:
-    source = Path(source_file).read_text()
+    source = Path(source_file).read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     import_structure = {}
@@ -25,7 +25,7 @@ def generate_import_structure_from_type_checking(source_file: str, base_path: st
                     module_rel = subnode.module.replace(".", "/")
                     for alias in subnode.names:
                         name = alias.name
-                        module_file = f"{base_path}{module_rel}.py"
+                        module_file = str(Path(base_path) / f"{module_rel}.py")
                         import_structure[name] = (module_file, name)
 
     return import_structure
@@ -156,8 +156,45 @@ class Registry():
         Get the object map of the registry.
         """
         return self._obj_map
+    
+    def get_type_of_operator(self):
+        """
+        Classify the operator type by its path of registration.
+        This is used to classify operators into different categories.
+        :return: A dictionary with operator type as keys and their name as values.
+        """
+        # eval operators
+        eval_operators = []
+        filter_operators = []
+        generate_operators = []
+        refine_operators = []
+        conversations_operators = []
+        db_operators = []
 
-OPERATOR_REGISTRY = Registry(name='operators', sub_modules=['eval', 'filter', 'generate', 'refine'])
+        for name, obj in self._obj_map.items():
+            if 'eval' in obj.__module__:
+                eval_operators.append(name)
+            elif 'filter' in obj.__module__:
+                filter_operators.append(name)
+            elif 'generate' in obj.__module__:
+                generate_operators.append(name)
+            elif 'refine' in obj.__module__:
+                refine_operators.append(name)
+            elif 'conversations' in obj.__module__:
+                conversations_operators.append(name)
+            elif 'db' in obj.__module__:
+                db_operators.append(name)
+
+        return {
+            'eval': eval_operators,
+            'filter': filter_operators,
+            'generate': generate_operators,
+            'refine': refine_operators,
+            'conversations': conversations_operators,
+            'db': db_operators
+        }
+
+OPERATOR_REGISTRY = Registry(name='operators', sub_modules=['eval', 'filter', 'generate', 'refine', 'conversations'])
 class LazyLoader(types.ModuleType):
 
     def __init__(self, name, path, import_structure):
@@ -186,18 +223,42 @@ class LazyLoader(types.ModuleType):
         :param class_name: 类的名字
         :return: 类对象
         """
-        abs_file_path = os.path.join(self._base_folder, file_path)
-        mod_name      = f"{self.__name__}.{Path(file_path).stem}"
+        p = Path(file_path)
+        if p.is_absolute():
+            abs_file_path = str(p)
+        else:
+            abs_file_path = str(Path(self._base_folder) / p)
         if not os.path.exists(abs_file_path):
-            raise FileNotFoundError(f"File {abs_file_path} does not exist")
+            raise FileNotFoundError(abs_file_path)
+        rel_path = Path(abs_file_path).relative_to(self._base_folder)
+        # 去掉后缀得到 ('dataflow', 'operators', 'generate', ... , 'question_generator')
+        rel_parts = rel_path.with_suffix('').parts
+        prefix_parts = tuple(self.__name__.split('.'))
+        if rel_parts[:len(prefix_parts)] == prefix_parts:
+            rel_parts = rel_parts[len(prefix_parts):]
+        mod_name = '.'.join((*prefix_parts, *rel_parts))
         logger = get_logger()
         # 动态加载模块
+
         try:
+            parts = mod_name.split(".")
+            for i in range(1, len(parts)):
+                parent = ".".join(parts[:i])
+                if parent not in sys.modules:
+                    dummy_mod = importlib.util.module_from_spec(
+                        importlib.util.spec_from_loader(parent, loader=None)
+                    )
+                    dummy_mod.__path__ = [os.path.dirname(abs_file_path)]
+                    sys.modules[parent] = dummy_mod
+
             spec = importlib.util.spec_from_file_location(mod_name, abs_file_path)
             logger.debug(f"LazyLoader {self.__path__} successfully imported spec {spec.__str__()}")
             module = importlib.util.module_from_spec(spec)
             sys.modules[mod_name] = module
             logger.debug(f"LazyLoader {self.__path__} successfully imported module {module.__str__()} from spec {spec.__str__()}")
+            logger.debug(f"Module name: {module.__name__}")
+            logger.debug(f"Module file: {module.__file__}")
+            logger.debug(f"Module package: {module.__package__}")
             spec.loader.exec_module(module)
         except Exception as e:
             logger.error(f"{e.__str__()}")

@@ -66,4 +66,5 @@ agent = [
     "pyyaml",
     "requests",
     "termcolor",
+    "uvicorn",
 ]
