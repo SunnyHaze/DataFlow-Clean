@@ -24,7 +24,6 @@ class AlpagasusFilter(OperatorABC):
         dataframe = storage.read("dataframe")
         scores = self.scorer.eval(dataframe, self.input_instruction_key, self.input_input_key, self.input_output_key)
         dataframe[self.output_key] = scores
-        print(scores)
         filtered_dataframe = dataframe[(dataframe[self.output_key] >= self.min_score) & (dataframe[self.output_key] <= self.max_score)]
         output_file = storage.write(filtered_dataframe)
         self.logger.info(f"Filtering completed. Total records passing filter: {len(filtered_dataframe)}.")
