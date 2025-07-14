@@ -14,7 +14,7 @@ class ConsistentChatGenerator(OperatorABC):
         self.logger = get_logger()
         self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.llm_serving = llm_serving
-        self.num_dialogs_per_intent = num_dialogs_per_intent
+        self.num_dialogs_per_intent = num_dialogs_per_intent # Based on the topic_dict in the existing prompt, it is recommended to set the value to below 1000 (which can generate 9000 conversation data). Otherwise, it is recommended to add more topic_dict in dataflow.prompts.general_text.ConsistentChatPrompt to increase data richness
         self.num_turns_per_dialog = num_turns_per_dialog
         self.temperature = temperature
         self.prompt = ConsistentChatPrompt()

@@ -12,6 +12,7 @@ from dataflow.prompts.general_text import CondorPrompt
 @OPERATOR_REGISTRY.register()
 class SupervisedFinetuneGenerator(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC = None, num_samples=15):
+        # Based on the existing topics, it is recommended to set num_samples below 5000. Otherwise, it is recommended to add topics in dataflow.prompts.general_text.CondorPrompt on your own to increase data richness
         self.logger = get_logger()
         self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.llm_serving = llm_serving
