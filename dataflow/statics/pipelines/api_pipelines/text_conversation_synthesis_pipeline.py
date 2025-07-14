@@ -2,7 +2,7 @@ from dataflow.operators.conversations import ConsistentChatGenerator
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request 
 import os
-os.environ['DF_API_KEY'] = 'Your Key'
+os.environ['DF_API_KEY'] = 'Your key'
 
 class TextPipeline():
     def __init__(self):
@@ -18,7 +18,7 @@ class TextPipeline():
             max_workers=100
         )
         self.model_cache_dir = './dataflow_cache'
-        self.processor = ConsistentChatGenerator(llm_serving=serving, num_dialogs_per_intent=750)
+        self.processor = ConsistentChatGenerator(llm_serving=serving, num_dialogs_per_intent=5)
 
     def forward(self):
         self.processor.run(

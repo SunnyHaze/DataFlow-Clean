@@ -42,11 +42,7 @@ class CondorRefiner(OperatorABC):
         # 生成修改后的答案
         refined_answers = self.generate_refined_answer(questions, answers, critique_responses)
         self.logger.info(f'Refined Answers generated.')
-
-        # Step 4: Prepare the final data for storage
-        for q, a, c, r in zip(questions, answers, critique_responses, refined_answers):
-            # 用 refined_answer 替换 input_output_key 中的原始答案
-            df[input_output_key] = r  # 使用refined_answer替换
+        df[input_output_key] = refined_answers
         output_file = storage.write(df)
         self.logger.info(f'Refined answers updated in storage.')
 

@@ -11,11 +11,11 @@ from dataflow.prompts.general_text import CondorPrompt
 
 @OPERATOR_REGISTRY.register()
 class SupervisedFinetuneGenerator(OperatorABC):
-    def __init__(self, llm_serving: LLMServingABC = None, num_questions=15):
+    def __init__(self, llm_serving: LLMServingABC = None, num_samples=15):
         self.logger = get_logger()
         self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.llm_serving = llm_serving
-        self.num_questions = num_questions // 3
+        self.num_questions = num_samples // 3
         self.prompt = CondorPrompt() 
         self.logger.info(f'{self.__class__.__name__} initialized.')
     

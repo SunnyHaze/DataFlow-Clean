@@ -3,7 +3,7 @@ from dataflow.operators.refine import CondorRefiner
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request 
 import os
-
+os.environ['DF_API_KEY'] = 'Your key'
 
 class TextPipeline():
     def __init__(self):
