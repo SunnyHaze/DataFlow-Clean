@@ -72,13 +72,17 @@ class AnswerNgramFilter(OperatorABC):
         
         dataframe = storage.read("dataframe")
         self.logger.info(f"Found {len(dataframe)} rows in the dataframe, DataFrame columns: {dataframe.columns}")
-
+        
+        missing_answer_logged = False
         scores = []
+        
         for _, sample in dataframe.iterrows():
             try:
                 answer = sample.get(self.question_key, "") + sample.get(self.answer_key, "")
             except Exception as e:
-                self.logger.error(f"Failed to get value for {self.question_key} or {self.answer_key}, {e}")
+                if not missing_answer_logged:
+                    self.logger.info(f"*** Only question is available ***")
+                    missing_answer_logged = True
                 answer = sample.get(self.question_key, "")
 
             content = answer.lower()
