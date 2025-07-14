@@ -84,7 +84,7 @@ if __name__ == "__main__":
         "py_path": f"{DATAFLOW_DIR}/test/operator_sentiment.py",
         "api_key": api_key,
         "chat_api_url": chat_api_url,
-        "execute_the_operator": False,
+        "execute_the_operator": True,
         "use_local_model": False,
         "local_model_name_or_path": "/mnt/public/model/huggingface/Qwen2.5-7B-Instruct",
         "timeout": 3600,
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "write":
         test_req = ChatAgentRequest(
             language="zh",
-            target="我需要一个算子，能够对用户评论进行情感分析并输出积极/消极标签。",
+            target="我需要一个算子，能够对数据进行情感分析并输出积极/消极标签。",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
             ** operator_write_params
@@ -115,18 +115,6 @@ if __name__ == "__main__":
         sys.exit(0)        
     uvicorn.run("test_dataflow_agent:app", host="0.0.0.0", port=8000, reload=True)
 
-    # 我需要一个新的算子，这个算子可以使用MinHash算法进行文本去重!!
-
-
-
-
-
-
-
-
-
-
-    
     # 我需要一个算子，能够检测文本中是否包含代码片段或数学公式，并进行格式化。
     # 我需要一个算子，能够自动从文本中提取最能表达主题的关键词。
     # 我需要一个算子，能够检测文本长度和密度。
