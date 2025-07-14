@@ -13,6 +13,8 @@
 
 <!-- [![](https://img.shields.io/github/last-commit/OpenDCAI/DataFlow)](https://github.com/OpenDCAI/DataFlow/commits/main/) -->
 
+🎉 If you like our project, please give us a star ⭐ on GitHub for the latest update.
+
 [简体中文](./README-zh.md) | English
 
 
