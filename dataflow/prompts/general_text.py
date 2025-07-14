@@ -1189,6 +1189,46 @@ question.\\
 Now it's your turn. Please provide the three Questions of different difficulty levels you created about the theme of {theme} for {domain}, according to the requirements.
 """
         return prompt
+    
+    def create_critique_prompt(self, question, answer):
+        dialogue = [question, answer]
+        base_critique_prompt = f"""
+There is now a user’s question and a model’s response. You need to write a critique for this response, pointing out the
+strengths and weaknesses of the model’s answer to help the model improve its response.
+
+Your critique must strictly adhere to the following format:
+
+[Critique Start]
+
+[Strength Start]Strength[Strength End]
+
+[Weakness Start]Weakness[Weakness End]
+
+[Suggestion Start]Suggestion[Suggestion End]
+
+[Critique End]
+
+Here is the user’s question and the model’s response: {dialogue}
+
+Now it’s your turn. Please provide your Critique as required:
+        """
+        return base_critique_prompt.format(dialogue=dialogue)
+
+    def create_refine_prompt(self, question, answer, critique):
+        base_refine_prompt = """
+Now there is a user's question, a model's answer, and the user's feedback. Please help modify the model's answer based on the user's feedback to make it better.
+Your improved answer must strictly adhere to the following format:
+
+[Improved Answer Start]Your answer[Improved Answer End]
+
+Below is the user's question, the model's answer, and the feedback:
+[Question Start]{question}[Question End]
+[Answer Start]{answer}[Answer End]
+[Feedback Start]{critique}[Feedback End]
+
+Now it's your turn, please provide your improved answer as required:
+        """
+        return base_refine_prompt.format(question=question, answer=answer, critique=critique)
 
 
 

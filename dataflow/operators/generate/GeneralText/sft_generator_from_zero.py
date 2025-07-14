@@ -11,11 +11,11 @@ from dataflow.prompts.general_text import CondorPrompt
 
 @OPERATOR_REGISTRY.register()
 class SupervisedFinetuneGenerator(OperatorABC):
-    def __init__(self, llm_serving: LLMServingABC = None, num_questions=21):
+    def __init__(self, llm_serving: LLMServingABC = None, num_questions=15):
         self.logger = get_logger()
         self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.llm_serving = llm_serving
-        self.num_questions = num_questions // 3 # 新增：指定问题生成数量
+        self.num_questions = num_questions // 3
         self.prompt = CondorPrompt() 
         self.logger.info(f'{self.__class__.__name__} initialized.')
     
@@ -51,9 +51,9 @@ class SupervisedFinetuneGenerator(OperatorABC):
         prompts = []
         for _ in range(self.num_questions):
             # 每次随机选择topic, domain, theme
-            topic = list(self.prompt.tag.keys())[0]
-            domain = list(self.prompt.tag[topic].keys())[0]
-            theme = self.prompt.tag[topic][domain][0]
+            topic = random.choice(list(self.prompt.tag.keys()))
+            domain = random.choice(list(self.prompt.tag[topic].keys()))
+            theme = random.choice(self.prompt.tag[topic][domain])
             # 获取生成问题的prompt
             prompt = self.prompt.get_question_prompt(theme, domain)
             prompts.append(prompt)
