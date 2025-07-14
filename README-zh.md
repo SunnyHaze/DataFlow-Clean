@@ -12,6 +12,8 @@
 
 <!-- [![](https://img.shields.io/github/last-commit/OpenDCAI/DataFlow)](https://github.com/OpenDCAI/DataFlow/commits/main/) -->
 
+🎉 如果你认可我们的项目，欢迎在 GitHub 上点个 ⭐ Star，关注项目最新进展。
+
 简体中文 | [English](./README.md)
 
 **[🚀 功能介绍](#功能介绍) • [⚡ 快速开始](#快速开始) • [📖 文档](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 实验结果](#实验结果)**

@@ -73,7 +73,7 @@ if __name__ == "__main__":
         "api_key": api_key,
         "chat_api_url": chat_api_url,
         "execute_the_pipeline": False,
-        "use_local_model": False,
+        "use_local_model": True,
         "local_model_name_or_path": "/mnt/public/model/huggingface/Qwen2.5-7B-Instruct",
         "timeout": 3600,
         "max_debug_round": 5
@@ -81,11 +81,11 @@ if __name__ == "__main__":
 
     operator_write_params = {
         "json_file": f"{DATAFLOW_DIR}/dataflow/example/ReasoningPipeline/pipeline_math_short.json",
-        "py_path": f"{DATAFLOW_DIR}/test/operator_sentiment.py",
+        "py_path": f"{DATAFLOW_DIR}/test/operator_contentSum.py",
         "api_key": api_key,
         "chat_api_url": chat_api_url,
         "execute_the_operator": False,
-        "use_local_model": False,
+        "use_local_model": True,
         "local_model_name_or_path": "/mnt/public/model/huggingface/Qwen2.5-7B-Instruct",
         "timeout": 3600,
         "max_debug_round": 5
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "recommend":
         test_req = ChatAgentRequest(
             language="zh",
-            target="帮我针对数据推荐一个的pipeline!!!只需要前3个算子！！不需要去重的算子 ！",
+            target="帮我针对数据推荐一个的pipeline!!!不需要去重的算子 ！",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
             **pipeline_recommend_params
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "write":
         test_req = ChatAgentRequest(
             language="zh",
-            target="我需要一个算子，能够对用户评论进行情感分析并输出积极/消极标签。",
+            target="我需要一个算子，直接使用llm_serving，实现语言翻译，把英文翻译成中文！",
             model="deepseek-v3",
             sessionKEY="dataflow_demo",
             ** operator_write_params
@@ -115,15 +115,7 @@ if __name__ == "__main__":
         sys.exit(0)        
     uvicorn.run("test_dataflow_agent:app", host="0.0.0.0", port=8000, reload=True)
 
-    # 我需要一个新的算子，这个算子可以使用MinHash算法进行文本去重!!    
-    # 我需要一个算子，能够检测文本中是否包含代码片段或数学公式，并进行格式化。
-    # 我需要一个算子，能够自动从文本中提取最能表达主题的关键词。
-    # 我需要一个算子，能够检测文本长度和密度。
-    # 我需要一个算子，直接使用LLMServing实现语言翻译，把英文翻译成中文！
-    # 我需要一个算子，能够通过LLM识别文本中的人名、地名、机构名等命名实体。
-    # 我需要一个算子，能够根据文本自动生成相关问题。
     # 我需要一个算子，能够对用户评论进行情感分析并输出积极/消极标签。
-    # 我需要一个算子，能够通过LLM自动识别并过滤垃圾广告或灌水内容。
-    # 我需要一个算子，直接使用LLMservinf进行总结，能够对输入的长文本自动生成摘要。
-    # 我需要一个算子，能够根据给定主题或关键词自动生成新文本。
-
+    # 我需要一个算子，能够计算文本的可读性分数并给出优化建议。
+    # 我需要一个新的算子，这个算子可以使用MinHash算法进行文本去重!!
+    # 我需要一个算子，直接使用LLMServing实现语言翻译，把英文翻译成中文！
