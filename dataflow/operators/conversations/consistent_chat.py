@@ -14,7 +14,7 @@ class ConsistentChatGenerator(OperatorABC):
         self.logger = get_logger()
         self.logger.info(f'Initializing {self.__class__.__name__}...')
         self.llm_serving = llm_serving
-        self.num_dialogs_per_intent = num_dialogs_per_intent
+        self.num_dialogs_per_intent = num_dialogs_per_intent # Based on the topic_dict in the existing prompt, it is recommended to set the value to below 1000 (which can generate 9000 conversation data). Otherwise, it is recommended to add more topic_dict in dataflow.prompts.general_text.ConsistentChatPrompt to increase data richness
         self.num_turns_per_dialog = num_turns_per_dialog
         self.temperature = temperature
         self.prompt = ConsistentChatPrompt()
@@ -37,10 +37,12 @@ class ConsistentChatGenerator(OperatorABC):
         cnt = 0
         for queries_str in queries_list:
             try:
+                if not isinstance(queries_str, str):
+                    raise ValueError("Invalid response type") 
                 clean_queries_str = queries_str.replace("```json", "").replace("```", "").strip()  
-                queries = json.loads(clean_queries_str)  # 解析成字典格式
+                queries = json.loads(clean_queries_str)
                 valid_queries.append(queries)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ValueError) as e:
                 cnt += 1
                 self.logger.debug(f'Json parse failed counts: {cnt} (Model generation error)')
                 continue
@@ -57,14 +59,17 @@ class ConsistentChatGenerator(OperatorABC):
         cnt = 0
         for query, responses_str in zip(valid_queries, responses_list):
             try:
-                clean_responses_str = responses_str.replace("```json", "").replace("```", "").strip()  
+                if not isinstance(responses_str, str):
+                    raise ValueError("Invalid response type")  
+                clean_responses_str = responses_str.replace("```json", "").replace("```", "").strip()
                 responses = json.loads(clean_responses_str) 
                 final_queries.append(query)
                 final_responses.append(responses)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ValueError) as e:
                 cnt += 1
-                self.logger.debug(f'Json parse failed counts: {cnt} (Model generation error)')
+                self.logger.debug(f'Json parse failed counts: {cnt} (Model generation error): {str(e)}')
                 continue
+
         formatted_data = []
 
         for query_data, response_data in zip(final_queries, final_responses):

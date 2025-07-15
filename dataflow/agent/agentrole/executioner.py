@@ -540,9 +540,9 @@ class ExecutionAgent:
 
     @staticmethod
     def _strip_json_comments(s: str) -> str:
-        s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)
-        s = re.sub(r"//.*$", "", s, flags=re.MULTILINE)
-        s = re.sub(r",\s*([}\]])", r"\1", s)
+        s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)           # 块注释
+        s = re.sub(r"^\s*//.*$", "", s, flags=re.MULTILINE)        # 行首 // 注释
+        s = re.sub(r",\s*([}\]])", r"\1", s)                       # 尾逗号
         return s
 
     def robust_parse_json(self, s: str) -> dict:
@@ -896,11 +896,12 @@ class ExecutionAgent:
                 response_content = await self.debug_agent.debug_pipeline_tool_code(
                     template_name   = "task_prompt_for_pipeline_code_debug",
                     code            = textwrap.dedent(code_src),
-                    error           = result.traceback,
+                    error           = f"{result.traceback},{result.stdout},{result.stderr}",
                     cls_detail_code = cls_detail_code,
                     history         = history,
                     data_keys       = data_keys,
                 )
+                logger.debug(f'[response_content]: 返回原文{response_content}')
                 json_content = self.robust_parse_json(response_content)
                 fixed_code: str | None = json_content.get("code")
                 wanted_ref_file = json_content.get("wanted_ref_file")

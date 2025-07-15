@@ -135,7 +135,8 @@ def generate_operator_py(
                 f"""\
                 # -------- LLM Serving (Remote) --------
                 llm_serving = APILLMServing_request(
-                    api_url="https://api.openai.com/v1/chat/completions",
+                    api_url="http://123.129.219.111:3000/v1/chat/completions",
+                    key_name_of_api_key = 'DF_API_KEY',
                     model_name="gpt-4o",
                     max_workers=100,
                 )
@@ -238,10 +239,17 @@ def local_tool_for_debug_and_exe_operator(
         return code
     if request.execute_the_operator:
         logger.info("\n[............Operator is running............]\n")
+        # run_res = subprocess.run(
+        #     [sys.executable, str(py_file)],
+        #     capture_output=True,
+        #     text=True,
+        # )
         run_res = subprocess.run(
-            [sys.executable, str(py_file)],
-            capture_output=True,
+            [sys.executable, "-u", str(py_file)],  
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,              
             text=True,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
         if run_res.returncode != 0:
             raise RuntimeError(
@@ -252,5 +260,6 @@ def local_tool_for_debug_and_exe_operator(
         logger.info(
             f"\n[............Operator {request.py_path} executed successfully............]\n"
             f"stdout:\n{run_res.stdout}"
+            f"stdout:\n{run_res.stderr}"
         )
     return code

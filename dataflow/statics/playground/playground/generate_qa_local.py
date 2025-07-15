@@ -1,8 +1,8 @@
 from dataflow.operators.generate import PromptedGenerator
-from dataflow.serving import LocalModelLLMServing, APILLMServing_request
+from dataflow.serving import LocalModelLLMServing_vllm
 from dataflow.utils.storage import FileStorage
 
-class GPT_generator():
+class Qwen_generator():
     def __init__(self):
         self.storage = FileStorage(
             first_entry_file_name="../example_data/GeneralTextPipeline/math_100.jsonl",
@@ -11,18 +11,21 @@ class GPT_generator():
             cache_type="jsonl",
         )
         self.model_cache_dir = './dataflow_cache'
-        self.llm_serving = APILLMServing_request(
-                api_url="http://123.129.219.111:3000/v1/chat/completions",
-                model_name="gpt-4o",
-                max_workers=50
+        self.llm_serving = LocalModelLLMServing_vllm(
+            hf_model_name_or_path="Qwen2.5-7B-Instruct", # set to your own model path
+            vllm_tensor_parallel_size=1,
+            vllm_max_tokens=8192,
         )
-        self.prompt_generator = PromptedGenerator(llm_serving = self.llm_serving)        
+
+        self.prompt_generator = PromptedGenerator(
+            llm_serving = self.llm_serving, 
+            system_prompt = "Please solve this math problem.",  # System prompt for math problem solving
+        )
 
     def forward(self):
         # Initial filters
         self.prompt_generator.run(
             storage = self.storage.step(),
-            system_prompt = "Please solve this math problem.",
             input_key = "problem",
         )
 
@@ -30,5 +33,5 @@ class GPT_generator():
 if __name__ == "__main__":
     # This is the entry point for the pipeline
 
-    model = GPT_generator()
+    model = Qwen_generator()
     model.forward()

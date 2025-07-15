@@ -34,6 +34,10 @@ class DataFlowPath:
         return DataFlowPath.get_dataflow_statics_dir() / "playground"
     
     @staticmethod
+    def get_dataflow_agentscript_dir():
+        return DataFlowPath.get_dataflow_statics_dir() / "dataflow_agent"
+    
+    @staticmethod
     def get_dataflow_agent_dir():
         return DataFlowPath.get_dataflow_dir() / "agent"
     

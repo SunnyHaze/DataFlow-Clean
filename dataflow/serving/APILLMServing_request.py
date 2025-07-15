@@ -147,7 +147,7 @@ class APILLMServing_request(LLMServingABC):
                     return id,self.format_response(response_data)
                 else:
                     logging.error(f"API request failed with status {response.status_code}: {response.text}")
-                    return id,None
+                    return id, None
             except Exception as e:
                 logging.error(f"API request error: {e}")
                 return id,None
