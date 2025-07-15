@@ -45,7 +45,6 @@ class ExecutionClassifier(OperatorABC):
             last_sql = sql_blocks[-1].strip()
             return last_sql
         else:
-            logger.warning(f"No SQL blocks found.")
             return ""
 
     @staticmethod
