@@ -25,10 +25,7 @@ def extract_json_object(model_output):
 from transformers import AutoTokenizer  # 引入 tokenizer 库
 
 @OPERATOR_REGISTRY.register()
-class SupervisedFinetuneGeneratorSeed(OperatorABC):
-    '''
-    Answer Generator is a class that generates answers for given questions.
-    '''
+class SFTGeneratorSeed(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC):
         self.logger = get_logger()
         self.prompts = SupervisedFinetuneGeneratorSeedPrompt()    
