@@ -1,4 +1,4 @@
-from dataflow.operators.generate import SupervisedFinetuneGenerator
+from dataflow.operators.generate import SFTGeneratorSeed
 from dataflow.operators.refine import CondorRefiner
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request 
@@ -17,7 +17,7 @@ class TextPipeline():
             max_workers=100
         )
         self.model_cache_dir = './dataflow_cache'
-        self.processor = SupervisedFinetuneGenerator(llm_serving=serving)
+        self.processor = SFTGeneratorSeed(llm_serving=serving)
         self.refiner = CondorRefiner(llm_serving=serving)
 
     def forward(self):
