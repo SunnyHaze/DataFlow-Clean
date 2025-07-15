@@ -62,18 +62,34 @@ class ExecutionFilter(OperatorABC):
         self.check_column(dataframe)
         results = []
         self.logger.info(f"Start to filter {len(dataframe)} SQLs")
+        db_id_need_to_check = dataframe[input_db_id_key].unique()
+        for db_id in db_id_need_to_check:
+            if not self.database_manager.registry.database_exists(db_id):
+                self.logger.warning(f"Database {db_id} not found in registry, please check the database folder")
+                continue
+
         for _, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Processing SQLs"):
             db_id = row[input_db_id_key]
             sql = row[input_sql_key]
         
             if not self.filter_select_sql(sql):
                 continue
-
-            ans = self.database_manager.analyze_sql_execution_plan(db_id, sql, 5)
-            if not ans['success']:
+            
+            try:
+                ans = self.database_manager.analyze_sql_execution_plan(db_id, sql, 5)
+            except Exception as e:
+                self.logger.error(f"Error analyzing SQL execution plan: {e}")
                 continue
             
-            ans = self.database_manager.execute_query(db_id, sql, 10)
+            if not ans['success']:
+                continue
+
+            try:
+                ans = self.database_manager.execute_query(db_id, sql, 10)
+            except Exception as e:
+                self.logger.error(f"Error executing SQL query: {e}")
+                continue
+                
             if not ans['success']:
                 continue
         
