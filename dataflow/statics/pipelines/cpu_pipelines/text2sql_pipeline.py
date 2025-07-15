@@ -15,7 +15,7 @@ class Text2SQLPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
-            first_entry_file_name="../example_data/ReasoningPipeline/pipeline_gen.json",
+            first_entry_file_name="../example_data/Text2SQLPipeline/pipeline_refine.jsonl",
             cache_path="./cache",
             file_name_prefix="dataflow_cache_step",
             cache_type="jsonl",
@@ -48,6 +48,17 @@ class Text2SQLPipeline():
         # db_type can be sqlite or mysql, which must match your database type
         # If sqlite is selected, root_path must be provided, this path must exist and contain database files
         # If mysql is selected, host, user, password must be provided, these credentials must be correct and have access permissions
+        # MySQL example:
+        # database_manager = DatabaseManager(
+        #     db_type="mysql",
+        #     config={
+        #         "host": "localhost",
+        #         "user": "root",
+        #         "password": "your_password",
+        #         "database": "your_database_name"
+        #     }
+        # )
+        # SQLite example:
         database_manager = DatabaseManager(
             db_type="sqlite",
             config={

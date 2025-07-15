@@ -75,7 +75,6 @@ class QuestionGeneration(OperatorABC):
         else:
             end_idx = start_idx + len(question_candidates)
             candidate_embeddings = embeddings[start_idx:end_idx]
-            
             distance_matrix = cdist(candidate_embeddings, candidate_embeddings, metric='cosine')
             distance_sums = distance_matrix.sum(axis=1)
             min_index = np.argmin(distance_sums)

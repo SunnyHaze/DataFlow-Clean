@@ -1,0 +1,305 @@
+{
+  "db_id": "california_schools",
+  "question": "What is the highest eligible free rate for K-12 students in the schools in Alameda County?",
+  "SQL": "SELECT `Free Meal Count (K-12)` / `Enrollment (K-12)` FROM frpm WHERE `County Name` = 'Alameda' ORDER BY (CAST(`Free Meal Count (K-12)` AS REAL) / `Enrollment (K-12)`) DESC LIMIT 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "Please list the lowest three eligible free rates for students aged 5-17 in continuation schools.",
+  "SQL": "SELECT `Free Meal Count (Ages 5-17)` / `Enrollment (Ages 5-17)` FROM frpm WHERE `Educational Option Type` = 'Continuation School' AND `Free Meal Count (Ages 5-17)` / `Enrollment (Ages 5-17)` IS NOT NULL ORDER BY `Free Meal Count (Ages 5-17)` / `Enrollment (Ages 5-17)` ASC LIMIT 3"
+}
+{
+  "db_id": "california_schools",
+  "question": "Please list the zip code of all the charter schools in Fresno County Office of Education.",
+  "SQL": "SELECT T2.Zip FROM frpm AS T1 INNER JOIN schools AS T2 ON T1.CDSCode = T2.CDSCode WHERE T1.`District Name` = 'Fresno County Office of Education' AND T1.`Charter School (Y/N)` = 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "What is the unabbreviated mailing street address of the school with the highest FRPM count for K-12 students?",
+  "SQL": "SELECT T2.MailStreet FROM frpm AS T1 INNER JOIN schools AS T2 ON T1.CDSCode = T2.CDSCode ORDER BY T1.`FRPM Count (K-12)` DESC LIMIT 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "Please list the phone numbers of the direct charter-funded schools that are opened after 2000/1/1.",
+  "SQL": "SELECT T2.Phone FROM frpm AS T1 INNER JOIN schools AS T2 ON T1.CDSCode = T2.CDSCode WHERE T1.`Charter Funding Type` = 'Directly funded' AND T1.`Charter School (Y/N)` = 1 AND T2.OpenDate > '2000-01-01'"
+}
+{
+  "db_id": "california_schools",
+  "question": "How many schools with an average score in Math greater than 400 in the SAT test are exclusively virtual?",
+  "SQL": "SELECT COUNT(DISTINCT T2.School) FROM satscores AS T1 INNER JOIN schools AS T2 ON T1.cds = T2.CDSCode WHERE T2.Virtual = 'F' AND T1.AvgScrMath > 400"
+}
+{
+  "db_id": "california_schools",
+  "question": "Among the schools with the SAT test takers of over 500, please list the schools that are magnet schools or offer a magnet program.",
+  "SQL": "SELECT T2.School FROM satscores AS T1 INNER JOIN schools AS T2 ON T1.cds = T2.CDSCode WHERE T2.Magnet = 1 AND T1.NumTstTakr > 500"
+}
+{
+  "db_id": "california_schools",
+  "question": "What is the phone number of the school that has the highest number of test takers with an SAT score of over 1500?",
+  "SQL": "SELECT T2.Phone FROM satscores AS T1 INNER JOIN schools AS T2 ON T1.cds = T2.CDSCode ORDER BY T1.NumGE1500 DESC LIMIT 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "What is the number of SAT test takers of the schools with the highest FRPM count for K-12 students?",
+  "SQL": "SELECT NumTstTakr FROM satscores WHERE cds = ( SELECT CDSCode FROM frpm ORDER BY `FRPM Count (K-12)` DESC LIMIT 1 )"
+}
+{
+  "db_id": "california_schools",
+  "question": "Among the schools with the average score in Math over 560 in the SAT test, how many schools are directly charter-funded?",
+  "SQL": "SELECT COUNT(T2.`School Code`) FROM satscores AS T1 INNER JOIN frpm AS T2 ON T1.cds = T2.CDSCode WHERE T1.AvgScrMath > 560 AND T2.`Charter Funding Type` = 'Directly funded'"
+}
+{
+  "db_id": "california_schools",
+  "question": "For the school with the highest average score in Reading in the SAT test, what is its FRPM count for students aged 5-17?",
+  "SQL": "SELECT T2.`FRPM Count (Ages 5-17)` FROM satscores AS T1 INNER JOIN frpm AS T2 ON T1.cds = T2.CDSCode ORDER BY T1.AvgScrRead DESC LIMIT 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "Please list the codes of the schools with a total enrollment of over 500.",
+  "SQL": "SELECT T2.CDSCode FROM schools AS T1 INNER JOIN frpm AS T2 ON T1.CDSCode = T2.CDSCode WHERE T2.`Enrollment (K-12)` + T2.`Enrollment (Ages 5-17)` > 500"
+}
+{
+  "db_id": "california_schools",
+  "question": "Among the schools with an SAT excellence rate of over 0.3, what is the highest eligible free rate for students aged 5-17?",
+  "SQL": "SELECT MAX(CAST(T1.`Free Meal Count (Ages 5-17)` AS REAL) / T1.`Enrollment (Ages 5-17)`) FROM frpm AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds WHERE CAST(T2.NumGE1500 AS REAL) / T2.NumTstTakr > 0.3"
+}
+{
+  "db_id": "california_schools",
+  "question": "Please list the phone numbers of the schools with the top 3 SAT excellence rate.",
+  "SQL": "SELECT T1.Phone FROM schools AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds ORDER BY CAST(T2.NumGE1500 AS REAL) / T2.NumTstTakr DESC LIMIT 3"
+}
+{
+  "db_id": "california_schools",
+  "question": "List the top five schools, by descending order, from the highest to the lowest, the most number of Enrollment (Ages 5-17). Please give their NCES school identification number.",
+  "SQL": "SELECT T1.NCESSchool FROM schools AS T1 INNER JOIN frpm AS T2 ON T1.CDSCode = T2.CDSCode ORDER BY T2.`Enrollment (Ages 5-17)` DESC LIMIT 5"
+}
+{
+  "db_id": "california_schools",
+  "question": "Which active district has the highest average score in Reading?",
+  "SQL": "SELECT T1.District FROM schools AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds WHERE T1.StatusType = 'Active' ORDER BY T2.AvgScrRead DESC LIMIT 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "How many schools in merged Alameda have number of test takers less than 100?",
+  "SQL": "SELECT COUNT(T1.CDSCode) FROM schools AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds WHERE T1.StatusType = 'Merged' AND T2.NumTstTakr < 100 AND T1.County = 'Lake'"
+}
+{
+  "db_id": "california_schools",
+  "question": "Rank schools by their average score in Writing where the score is greater than 499, showing their charter numbers.",
+  "SQL": "SELECT CharterNum, AvgScrWrite, RANK() OVER (ORDER BY AvgScrWrite DESC) AS WritingScoreRank FROM schools AS T1  INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds WHERE T2.AvgScrWrite > 499 AND CharterNum is not null"
+}
+{
+  "db_id": "california_schools",
+  "question": "How many schools in Fresno (directly funded) have number of test takers not more than 250?",
+  "SQL": "SELECT COUNT(T1.CDSCode) FROM frpm AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds WHERE T1.`Charter Funding Type` = 'Directly funded' AND T1.`County Name` = 'Fresno' AND T2.NumTstTakr <= 250"
+}
+{
+  "db_id": "california_schools",
+  "question": "What is the phone number of the school that has the highest average score in Math?",
+  "SQL": "SELECT T1.Phone FROM schools AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds ORDER BY T2.AvgScrMath DESC LIMIT 1"
+}
+{
+  "db_id": "california_schools",
+  "question": "How many schools in Amador which the Low Grade is 9 and the High Grade is 12?",
+  "SQL": "SELECT COUNT(T1.`School Name`) FROM frpm AS T1 INNER JOIN schools AS T2 ON T1.CDSCode = T2.CDSCode WHERE T2.County = 'Amador' AND T1.`Low Grade` = 9 AND T1.`High Grade` = 12"
+}
+{
+  "db_id": "financial",
+  "question": "How many accounts who choose issuance after transaction are staying in East Bohemia region?",
+  "SQL": "SELECT COUNT(T2.account_id) FROM district AS T1 INNER JOIN account AS T2 ON T1.district_id = T2.district_id WHERE T1.A3 = 'east Bohemia' AND T2.frequency = 'POPLATEK PO OBRATU'"
+}
+{
+  "db_id": "financial",
+  "question": "How many accounts who have region in Prague are eligible for loans?",
+  "SQL": "SELECT COUNT(T1.account_id) FROM account AS T1 INNER JOIN loan AS T2 ON T1.account_id = T2.account_id INNER JOIN district AS T3 ON T1.district_id = T3.district_id WHERE T3.A3 = 'Prague'"
+}
+{
+  "db_id": "financial",
+  "question": "The average unemployment ratio of 1995 and 1996, which one has higher percentage?",
+  "SQL": "SELECT DISTINCT IIF(AVG(A13) > AVG(A12), '1996', '1995') FROM district"
+}
+{
+  "db_id": "financial",
+  "question": "List out the no. of districts that have female average salary is more than 6000 but less than 10000?",
+  "SQL": "SELECT COUNT(DISTINCT T2.district_id)  FROM client AS T1 INNER JOIN district AS T2 ON T1.district_id = T2.district_id WHERE T1.gender = 'F' AND T2.A11 BETWEEN 6000 AND 10000"
+}
+{
+  "db_id": "financial",
+  "question": "How many male customers who are living in North Bohemia have average salary greater than 8000?",
+  "SQL": "SELECT COUNT(T1.client_id) FROM client AS T1 INNER JOIN district AS T2 ON T1.district_id = T2.district_id WHERE T1.gender = 'M' AND T2.A3 = 'north Bohemia' AND T2.A11 > 8000"
+}
+{
+  "db_id": "financial",
+  "question": "List out the account numbers of female clients who are oldest and has lowest average salary, calculate the gap between this lowest average salary with the highest average salary?",
+  "SQL": "SELECT T1.account_id , ( SELECT MAX(A11) - MIN(A11) FROM district ) FROM account AS T1 INNER JOIN district AS T2 ON T1.district_id = T2.district_id INNER JOIN disp AS T3 ON T1.account_id = T3.account_id INNER JOIN client AS T4 ON T3.client_id = T4.client_id WHERE T2.district_id = ( SELECT district_id FROM client WHERE gender = 'F' ORDER BY birth_date ASC LIMIT 1 ) ORDER BY T2.A11 DESC LIMIT 1"
+}
+{
+  "db_id": "financial",
+  "question": "List out the account numbers of clients who are youngest and have highest average salary?",
+  "SQL": "SELECT T1.account_id  FROM account AS T1 INNER JOIN disp AS T2 ON T1.account_id = T2.account_id INNER JOIN client AS T3 ON T2.client_id = T3.client_id INNER JOIN district AS T4 on T4.district_id = T1.district_id WHERE T2.client_id = ( SELECT client_id FROM client ORDER BY birth_date DESC LIMIT 1) GROUP BY T4.A11, T1.account_id"
+}
+{
+  "db_id": "financial",
+  "question": "How many customers who choose statement of weekly issuance are Owner?",
+  "SQL": "SELECT COUNT(T1.account_id) FROM account AS T1 INNER JOIN disp AS T2 ON T1.account_id = T2.account_id WHERE T2.type = 'OWNER' AND T1.frequency = 'POPLATEK TYDNE'"
+}
+{
+  "db_id": "financial",
+  "question": "List out the id number of client who choose statement of issuance after transaction are Disponent?",
+  "SQL": "SELECT T2.client_id FROM account AS T1 INNER JOIN disp AS T2 ON T1.account_id = T2.account_id WHERE T1.frequency = 'POPLATEK PO OBRATU' AND T2.type = 'DISPONENT'"
+}
+{
+  "db_id": "financial",
+  "question": "Among the accounts who have approved loan date in 1997, list out the accounts that have the lowest approved amount and choose weekly issuance statement.",
+  "SQL": "SELECT T2.account_id FROM loan AS T1 INNER JOIN account AS T2 ON T1.account_id = T2.account_id WHERE STRFTIME('%Y', T1.date) = '1997' AND T2.frequency = 'POPLATEK TYDNE' ORDER BY T1.amount LIMIT 1"
+}
+{
+  "db_id": "financial",
+  "question": "Among the accounts who have loan validity more than 12 months, list out the accounts that have the highest approved amount and have account opening date in 1993.",
+  "SQL": "SELECT T1.account_id FROM loan AS T1 INNER JOIN account AS T2 ON T1.account_id = T2.account_id WHERE STRFTIME('%Y', T2.date) = '1993' AND T1.duration > 12 ORDER BY T1.amount DESC LIMIT 1"
+}
+{
+  "db_id": "financial",
+  "question": "Among the account opened, how many female customers who were born before 1950 and stayed in Sokolov?",
+  "SQL": "SELECT COUNT(T2.client_id) FROM district AS T1 INNER JOIN client AS T2 ON T1.district_id = T2.district_id WHERE T2.gender = 'F' AND STRFTIME('%Y', T2.birth_date) < '1950' AND T1.A2 = 'Sokolov'"
+}
+{
+  "db_id": "financial",
+  "question": "List out the accounts who have the earliest trading date in 1995 ?",
+  "SQL": "SELECT account_id FROM trans WHERE STRFTIME('%Y', date) = '1995' ORDER BY date ASC LIMIT 1"
+}
+{
+  "db_id": "financial",
+  "question": "State different accounts who have account opening date before 1997 and own an amount of money greater than 3000USD",
+  "SQL": "SELECT DISTINCT T2.account_id FROM trans AS T1 INNER JOIN account AS T2 ON T1.account_id = T2.account_id WHERE STRFTIME('%Y', T2.date) < '1997' AND T1.amount > 3000"
+}
+{
+  "db_id": "financial",
+  "question": "Which client issued his/her card in 1994/3/3, give his/her client id.",
+  "SQL": "SELECT T2.client_id FROM client AS T1 INNER JOIN disp AS T2 ON T1.client_id = T2.client_id INNER JOIN card AS T3 ON T2.disp_id = T3.disp_id WHERE T3.issued = '1994-03-03'"
+}
+{
+  "db_id": "financial",
+  "question": "The transaction of 840 USD happened in 1998/10/14, when was this account opened?",
+  "SQL": "SELECT T1.date FROM account AS T1 INNER JOIN trans AS T2 ON T1.account_id = T2.account_id WHERE T2.amount = 840 AND T2.date = '1998-10-14'"
+}
+{
+  "db_id": "financial",
+  "question": "There was a loan approved in 1994/8/25, where was that account opened, give the district Id of the branch.",
+  "SQL": "SELECT T1.district_id FROM account AS T1 INNER JOIN loan AS T2 ON T1.account_id = T2.account_id WHERE T2.date = '1994-08-25'"
+}
+{
+  "db_id": "financial",
+  "question": "What is the biggest amount of transaction that the client whose card was opened in 1996/10/21 made?",
+  "SQL": "SELECT T4.amount FROM card AS T1 JOIN disp AS T2 ON T1.disp_id = T2.disp_id JOIN account AS T3 on T2.account_id = T3.account_id JOIN trans AS T4 on T3.account_id = T4.account_id WHERE T1.issued = '1996-10-21' ORDER BY T4.amount DESC LIMIT 1"
+}
+{
+  "db_id": "financial",
+  "question": "What is the gender of the oldest client who opened his/her account in the highest average salary branch?",
+  "SQL": "SELECT T2.gender FROM district AS T1 INNER JOIN client AS T2 ON T1.district_id = T2.district_id ORDER BY T1.A11 DESC, T2.birth_date ASC LIMIT 1"
+}
+{
+  "db_id": "financial",
+  "question": "For the client who applied the biggest loan, what was his/her first amount of transaction after opened the account?",
+  "SQL": "SELECT T3.amount FROM loan AS T1 INNER JOIN account AS T2 ON T1.account_id = T2.account_id INNER JOIN trans AS T3 ON T2.account_id = T3.account_id ORDER BY T1.amount DESC, T3.date ASC LIMIT 1"
+}
+{
+  "db_id": "card_games",
+  "question": "Which are the cards that have incredibly powerful foils.",
+  "SQL": "SELECT id FROM cards WHERE cardKingdomFoilId IS NOT NULL AND cardKingdomId IS NOT NULL"
+}
+{
+  "db_id": "card_games",
+  "question": "What are the borderless cards available without powerful foils?",
+  "SQL": "SELECT id FROM cards WHERE borderColor = 'borderless' AND (cardKingdomId IS NULL OR cardKingdomId IS NULL)"
+}
+{
+  "db_id": "card_games",
+  "question": "List the card names with value that cost more converted mana for the face.",
+  "SQL": "SELECT name FROM cards ORDER BY faceConvertedManaCost LIMIT 1"
+}
+{
+  "db_id": "card_games",
+  "question": "Name all cards with 2015 frame style ranking below 100 on EDHRec.",
+  "SQL": "SELECT id FROM cards WHERE edhrecRank < 100 AND frameVersion = 2015"
+}
+{
+  "db_id": "card_games",
+  "question": "List all the mythic rarity print cards banned in gladiator format.",
+  "SQL": "SELECT DISTINCT T1.id FROM cards AS T1 INNER JOIN legalities AS T2 ON T1.uuid = T2.uuid WHERE T2.format = 'gladiator' AND T2.status = 'Banned' AND T1.rarity = 'mythic'"
+}
+{
+  "db_id": "card_games",
+  "question": "For artifact type of cards that do not have multiple faces on the same card, state its legalities status for vintage play format.",
+  "SQL": "SELECT DISTINCT T2.status FROM cards AS T1 INNER JOIN legalities AS T2 ON T1.uuid = T2.uuid WHERE T1.type = 'Artifact' AND T2.format = 'vintage' AND T1.side IS NULL"
+}
+{
+  "db_id": "card_games",
+  "question": "List all the card id and artist with unknown power which are legal for commander play format.",
+  "SQL": "SELECT T1.id, T1.artist FROM cards AS T1 INNER JOIN legalities AS T2 ON T1.uuid = T2.uuid WHERE T2.status = 'Legal' AND T2.format = 'commander' AND (T1.power IS NULL OR T1.power = '*')"
+}
+{
+  "db_id": "card_games",
+  "question": "Find all cards illustrated by Stephen Daniel and describe the text of the ruling of these cards. State if these cards have missing or degraded properties and values.",
+  "SQL": "SELECT T1.id, T2.text, T1.hasContentWarning FROM cards AS T1 INNER JOIN rulings AS T2 ON T1.uuid = T2.uuid WHERE T1.artist = 'Stephen Daniele'"
+}
+{
+  "db_id": "card_games",
+  "question": "Describe the information about rulings for card named 'Sublime Epiphany' with number 74s.",
+  "SQL": "SELECT T2.text FROM cards AS T1 INNER JOIN rulings AS T2 ON T1.uuid = T2.uuid WHERE T1.name = 'Sublime Epiphany' AND T1.number = '74s'"
+}
+{
+  "db_id": "card_games",
+  "question": "Name the card and artist with the most ruling information. Also state if the card is a promotional printing.",
+  "SQL": "SELECT T1.name, T1.artist, T1.isPromo FROM cards AS T1 INNER JOIN rulings AS T2 ON T1.uuid = T2.uuid WHERE T1.isPromo = 1 AND T1.artist = (SELECT artist FROM cards WHERE isPromo = 1 GROUP BY artist HAVING COUNT(DISTINCT uuid) = (SELECT MAX(count_uuid) FROM ( SELECT COUNT(DISTINCT uuid) AS count_uuid FROM cards WHERE isPromo = 1 GROUP BY artist ))) LIMIT 1"
+}
+{
+  "db_id": "card_games",
+  "question": "State the alternative languages available for card named Annul numbered 29.",
+  "SQL": "SELECT T2.language FROM cards AS T1 INNER JOIN foreign_data AS T2 ON T1.uuid = T2.uuid WHERE T1.name = 'Annul' AND T1.number = 29"
+}
+{
+  "db_id": "card_games",
+  "question": "Name all the cards which have alternative language in Japanese.",
+  "SQL": "SELECT T1.name FROM cards AS T1 INNER JOIN foreign_data AS T2 ON T1.uuid = T2.uuid WHERE T2.language = 'Japanese'"
+}
+{
+  "db_id": "card_games",
+  "question": "Calculate the percentage of the cards availabe in Chinese Simplified.",
+  "SQL": "SELECT CAST(SUM(CASE WHEN T2.language = 'Chinese Simplified' THEN 1 ELSE 0 END) AS REAL) * 100 / COUNT(T1.id) FROM cards AS T1 INNER JOIN foreign_data AS T2 ON T1.uuid = T2.uuid"
+}
+{
+  "db_id": "card_games",
+  "question": "List all the sets available in Italian translation. State the total number of cards per set.",
+  "SQL": "SELECT T1.name, T1.totalSetSize FROM sets AS T1 INNER JOIN set_translations AS T2 ON T1.code = T2.setCode WHERE T2.language = 'Italian'"
+}
+{
+  "db_id": "card_games",
+  "question": "How many types of cards does the artist Aaron Boyd illustrated about card art?",
+  "SQL": "SELECT COUNT(type) FROM cards WHERE artist = 'Aaron Boyd'"
+}
+{
+  "db_id": "card_games",
+  "question": "What is the keyword found on card 'Angel of Mercy'?",
+  "SQL": "SELECT DISTINCT keywords FROM cards WHERE name = 'Angel of Mercy'"
+}
+{
+  "db_id": "card_games",
+  "question": "How many cards have infinite power?",
+  "SQL": "SELECT COUNT(*) FROM cards WHERE power = '*'"
+}
+{
+  "db_id": "card_games",
+  "question": "What type of promotion is of card 'Duress'?",
+  "SQL": "SELECT promoTypes FROM cards WHERE name = 'Duress' AND promoTypes IS NOT NULL"
+}
+{
+  "db_id": "card_games",
+  "question": "What is the border color of card \"Ancestor's Chosen\"?",
+  "SQL": "SELECT DISTINCT borderColor FROM cards WHERE name = 'Ancestor''s Chosen'"
+}
+{
+  "db_id": "card_games",
+  "question": "What is the type of the card \"Ancestor's Chosen\" as originally printed?",
+  "SQL": "SELECT originalType FROM cards WHERE name = 'Ancestor''s Chosen' AND originalType IS NOT NULL"
+}

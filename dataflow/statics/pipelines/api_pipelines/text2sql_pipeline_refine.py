@@ -21,27 +21,27 @@ class Text2SQLPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
-            first_entry_file_name="../example_data/Text2SQLPipeline/pipeline_gen.json",
+            first_entry_file_name="../example_data/Text2SQLPipeline/pipeline_refine.jsonl",
             cache_path="./cache_local",
             file_name_prefix="dataflow_cache_step",
             cache_type="jsonl"
         )
 
         api_llm_serving = APILLMServing_request(
-            api_url="http://123.129.219.111:3000/v1/chat/completions",
+            api_url="http://api.openai.com/v1/chat/completions",
             model_name="gpt-4o",
             max_workers=100
         )
 
         # It is recommended to use better LLMs for the generation of Chain-of-Thought (CoT) reasoning process.
         cot_generation_api_llm_serving = APILLMServing_request(
-            api_url="http://123.129.219.111:3000/v1/chat/completions",
+            api_url="http://api.openai.com/v1/chat/completions",
             model_name="gpt-4o", # You can change to a more powerful model for CoT generation
             max_workers=100
         )
 
         embedding_api_llm_serving = APILLMServing_request(
-            api_url="http://123.129.219.111:3000/v1/embeddings",
+            api_url="http://api.openai.com/v1/embeddings",
             model_name="text-embedding-ada-002",
             max_workers=100
         )
@@ -78,6 +78,17 @@ class Text2SQLPipeline():
         # db_type can be sqlite or mysql, which must match your database type
         # If sqlite is selected, root_path must be provided, this path must exist and contain database files
         # If mysql is selected, host, user, password must be provided, these credentials must be correct and have access permissions
+        # MySQL example:
+        # database_manager = DatabaseManager(
+        #     db_type="mysql",
+        #     config={
+        #         "host": "localhost",
+        #         "user": "root",
+        #         "password": "your_password",
+        #         "database": "your_database_name"
+        #     }
+        # )
+        # SQLite example:
         database_manager = DatabaseManager(
             db_type="sqlite",
             config={
