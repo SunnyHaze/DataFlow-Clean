@@ -11,11 +11,13 @@ import json
 @OPERATOR_REGISTRY.register()
 class DepthQAGenerator(OperatorABC):
     def __init__(self,
-                 llm_serving: LLMServingABC = None
+                 llm_serving: LLMServingABC = None,
+                 n_rounds:int = 2
                  ):
         self.logger= get_logger()
         self.prompts = DepthQAGeneratorPrompt()
         self.llm_serving = llm_serving
+        self.n_rounds = n_rounds
 
     @staticmethod
     def get_desc(self, lang):
@@ -104,7 +106,6 @@ class DepthQAGenerator(OperatorABC):
             storage: DataFlowStorage,
             input_key:str = "question",
             output_key:str = "depth_question",
-            n_rounds:int = 2
             ):
         self.input_key, self.output_key = input_key, output_key
         dataframe = storage.read("dataframe")
@@ -116,7 +117,7 @@ class DepthQAGenerator(OperatorABC):
             dataframe["identifier"] = identifiers
 
         # step0: get identifier
-        for round_id in range(1, n_rounds + 1):
+        for round_id in range(1, self.n_rounds + 1):
             self.logger.info(f"=== Iteration Round {round_id} ===")
 
             # Use identifier from previous round
@@ -208,6 +209,6 @@ class DepthQAGenerator(OperatorABC):
         output_file = storage.write(dataframe)
         self.logger.info(f"Results saved to {output_file}")
         
-        return [f"new_identifier_{i}" for i in range(1, n_rounds + 1)] + \
-               [f"relation_{i}" for i in range(1, n_rounds + 1)] + \
-               [f"{output_key}_{i}" for i in range(1, n_rounds + 1)]
+        return [f"new_identifier_{i}" for i in range(1, self.n_rounds + 1)] + \
+               [f"relation_{i}" for i in range(1, self.n_rounds + 1)] + \
+               [f"{output_key}_{i}" for i in range(1, self.n_rounds + 1)]
