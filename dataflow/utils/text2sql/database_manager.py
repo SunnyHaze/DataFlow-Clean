@@ -364,7 +364,6 @@ class DatabaseManager:
                 conn = connector.connect(db_info.connection_info)
                 rows = connector.execute_query(conn, sql)
                 
-                # 获取列名（如果可能）
                 columns = []
                 if hasattr(conn, 'cursor'):
                     cursor = conn.cursor()
@@ -386,16 +385,13 @@ class DatabaseManager:
                     except:
                         pass
         
-        # 创建并启动线程
         thread = threading.Thread(target=execute_query)
         thread.daemon = True
         thread.start()
         
-        # 等待线程完成或超时
         thread.join(timeout)
         
-        if thread.is_alive():
-            # 超时处理
+        if thread.is_alive():   
             if self.logger:
                 self.logger.warning(f"Query timeout after {timeout}s for database {db_id}")
             return {
