@@ -31,6 +31,7 @@ class CoTGenerator(OperatorABC):
             self.schema_config = schema_config
         self.max_retries = max_retries
         self.enable_retry = enable_retry
+        self._validate_config()
 
     def check_column(self, dataframe):
         required_columns = [self.input_sql_key, self.input_db_id_key, self.input_question_key]
