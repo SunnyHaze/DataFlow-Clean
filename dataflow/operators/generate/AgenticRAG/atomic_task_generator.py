@@ -26,15 +26,31 @@ class AtomicTaskGenerator(OperatorABC):
         self.data_num, self.max_per_task, self.max_question = data_num, max_per_task, max_question
 
     @staticmethod
-    def get_desc(self, lang):
+    def get_desc(lang: str = "zh"):
         if lang == "zh":
             return (
+                "该算子用于为提供的文本内容生成合适的高质量问题与可验证答案。\n\n"
+                "输入参数：\n"
+                "- input_key: 输入文本内容字段名（默认值：\"prompts\"）\n"
+                "- output_question_key: 输出问题字段名（默认值：\"question\"）\n"
+                "- output_answer_key: 输出答案字段名（默认值：\"answer\"）\n"
+                "- output_refined_answer_key: 输出精炼答案字段名（默认值：\"refined_answer\"）\n"
+                "- output_optional_answer_key: 输出可替代精炼答案字段名（默认值：\"optional_answer\"）\n"
+                "- output_golden_doc_answer_key: 输出黄金文档回答字段名（默认值：\"golden_doc_answer\"）\n"
             )
         elif lang == "en":
             return (
+                "This operator is used to generate appropriate high-quality questions and verifiable answers for the provided text content."
+                "Input Parameters:\n"
+                "- input_key: Field name of the input text content (default: \"prompts\")\n"
+                "- output_question_key: Field name for the output question (default: \"question\")\n"
+                "- output_answer_key: Field name for the output answer (default: \"answer\")\n"
+                "- output_refined_answer_key: Field name for the output refined answer (default: \"refined_answer\")\n"
+                "- output_optional_answer_key: Field name for the output optional refined answer (default: \"optional_answer\")\n"
+                "- output_golden_doc_answer_key: Field name for the output answer based on gold documents (default: \"golden_doc_answer\")\n"
             )
         else:
-            return
+            return "AtomicTaskGenerator generate appropriate high-quality questions and verifiable answers for the provided text content."
     
     def _validate_dataframe(self, dataframe: pd.DataFrame):
         required_keys = [self.input_key]

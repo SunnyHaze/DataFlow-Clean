@@ -20,15 +20,23 @@ class DepthQAGenerator(OperatorABC):
         self.n_rounds = n_rounds
 
     @staticmethod
-    def get_desc(self, lang):
+    def get_desc(lang: str = "zh"):
         if lang == "zh":
             return (
+                "该算子以已有问答生成更深度的问题。\n\n"
+                "输入参数：\n"
+                "- input_key: 输入字段名（默认值：\"question\"）\n"
+                "- output_key: 输出字段名（默认值：\"depth_question\"）\n"
             )
         elif lang == "en":
             return (
+                "This operator is used to generate deeper questions based on existing QA pairs."
+                "Input Parameters:\n"
+                "- input_key: Field name for the input (default: \"question\")\n"
+                "- output_key: Field name for the output (default: \"depth_question\")\n"
             )
         else:
-            return
+            return "DepthQAGenerator generate deeper questions based on existing QA pairs."
     
     def _validate_dataframe(self, dataframe: pd.DataFrame):
         required_keys = [self.input_key]
