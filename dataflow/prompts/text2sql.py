@@ -49,13 +49,8 @@ class CotGenerationPrompt:
         prompt = f"""
         You are a senior data analyst specializing in SQL. Your task is to translate a natural language question into an executable SQLite query, providing a detailed reasoning trace.
 
-        You will also receive a reference solution from a colleague, which has been reviewed and confirmed as correct. Use it as guidance to generate your answer. Ensure your SQL query strictly aligns with the logic, fields, and constraints of the provided reference solution.
-
-        Rules you must follow:
-        - Do NOT add or remove tables or columns compared to the reference solution.
-        - Maintain the same filtering logic and conditions as the reference solution.
-        - Do NOT change the LIMIT, ORDER BY, or GROUP BY logic.
-
+        You will also receive a reference solution from a colleague, which may or may not be correct. This extra information intends to help you generate your answer, but you are asked not to mention the reference solution in any form.
+        
         Ensure the SQL query is presented in a Markdown code block with proper syntax highlighting, like this:
         ```sql
         SELECT * FROM table;
