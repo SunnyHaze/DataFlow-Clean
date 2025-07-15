@@ -6,6 +6,7 @@ import threading
 import os
 import glob
 from dataclasses import dataclass
+from dataflow import get_logger
 
 
 @dataclass
@@ -267,7 +268,7 @@ class DatabaseManager:
     def __init__(self, db_type: str = "sqlite", config: Optional[Dict] = None, logger=None):
         self.db_type = db_type.lower()
         self.config = config or {}
-        self.logger = logger
+        self.logger = get_logger()
         
         self.registry = DatabaseRegistry(logger)
         self.cache = SchemaCache()
@@ -427,7 +428,11 @@ class DatabaseManager:
     def analyze_sql_execution_plan(self, db_id: str, sql: str, timeout: float = 5.0) -> Dict[str, Any]:
         db_info = self.registry.get_database(db_id)
         if not db_info:
-            raise ValueError(f"Database {db_id} not found")
+            self.logger.error(f"Database {db_id} not found")
+            return {
+                'success': False,
+                'error': f'Database {db_id} not found'
+            }
         
         connector = self.connectors[db_info.db_type]
         result = None
