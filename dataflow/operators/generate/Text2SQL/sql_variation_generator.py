@@ -24,6 +24,25 @@ class SQLVariationGenerator(OperatorABC):
         self.num_variations = num_variations
         random.seed(42)
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子生成SQL的变种。\n\n"
+                "输入参数：\n"
+                "- input_sql_key: SQL列名\n"
+                "- input_db_id_key: 数据库ID列名\n\n"
+            )
+        elif lang == "en":
+            return (
+                "This operator generates variations of SQL.\n\n"
+                "Input parameters:\n"
+                "- input_sql_key: The name of the SQL column\n"
+                "- input_db_id_key: The name of the database ID column\n\n"
+            )
+        else:
+            return "SQL variation generator for Text2SQL tasks."
+
     def obtain_db_schema(self, db_manager: DatabaseManager, db_id: str) -> tuple:
         return db_manager.get_table_names_and_create_statements(db_id)
 

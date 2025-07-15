@@ -30,6 +30,29 @@ class QuestionGeneration(OperatorABC):
         self.question_candidates_num = question_candidates_num
         random.seed(42)
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子从数据库提取Schema信息并生成Text2SQL的问题。\n\n"
+                "输入参数：\n"
+                "- input_question_key: 问题列名\n"
+                "- input_db_id_key: 数据库ID列名\n\n"
+                "输出参数：\n"
+                "- output_question_key: 输出问题列名"
+            )
+        elif lang == "en":
+            return (
+                "This operator extracts schema information from databases and generates Text2SQL questions.\n\n"
+                "Input parameters:\n"
+                "- input_question_key: The name of the question column\n"
+                "- input_db_id_key: The name of the database ID column\n\n"
+                "Output parameters:\n"
+                "- output_question_key: The name of the output question column"
+            )
+        else:
+            return "Database schema extractor and question generator for Text2SQL tasks."
+
     def extract_column_descriptions(self, create_statements):
         column_name2column_desc = dict()
         pattern = r'"(\w+)"\s+\w+\s*/\*\s*(.*?)\s*\*/'

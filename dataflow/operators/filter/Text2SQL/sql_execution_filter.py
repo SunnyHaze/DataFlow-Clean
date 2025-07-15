@@ -14,6 +14,25 @@ class ExecutionFilter(OperatorABC):
         self.database_manager = database_manager
         self.logger = get_logger()
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子过滤SQL的执行。\n\n"
+                "输入参数：\n"
+                "- input_sql_key: 输入SQL列名\n"
+                "- input_db_id_key: 输入数据库ID列名\n\n"
+            )
+        elif lang == "en":
+            return (
+                "This operator filters SQL execution.\n\n"
+                "Input parameters:\n"
+                "- input_sql_key: The name of the input SQL column\n"
+                "- input_db_id_key: The name of the input database ID column\n\n"
+            )
+        else:
+            return "SQL execution filter for Text2SQL tasks."
+
     def filter_select_sql(self, sql):
         '''
             remain SELECT-type queries

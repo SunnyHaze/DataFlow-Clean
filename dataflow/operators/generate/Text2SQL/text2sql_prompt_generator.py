@@ -49,6 +49,31 @@ class PromptGenerator(OperatorABC):
         if not isinstance(self.schema_config.get('use_example'), bool):
             raise ValueError("schema_config.use_example must be a boolean")
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子从数据库提取Schema信息并生成Text2SQL的prompt。\n\n"
+                "输入参数：\n"
+                "- input_question_key: 问题列名\n"
+                "- input_db_id_key: 数据库ID列名\n"
+                "- output_prompt_key: 输出prompt列名\n\n"
+                "输出参数：\n"
+                "- output_prompt_key: 生成的prompt"
+            )
+        elif lang == "en":
+            return (
+                "This operator extracts schema information from databases and generates Text2SQL prompts.\n\n"
+                "Input parameters:\n"
+                "- input_question_key: The name of the question column\n"
+                "- input_db_id_key: The name of the database ID column\n"
+                "- output_prompt_key: The name of the output prompt column\n\n"
+                "Output parameters:\n"
+                "- output_prompt_key: The generated prompt"
+            )
+        else:
+            return "Database schema extractor and prompt generator for Text2SQL tasks."
+
     def get_schema_for_db(self, db_id: str) -> Dict:
         return self.database_manager.get_database_schema(db_id)
 
@@ -100,31 +125,6 @@ class PromptGenerator(OperatorABC):
                 self.output_sft_prompt_key: f"Error processing item: {e}",
                 '_error': str(e)
             }
-
-    @staticmethod
-    def get_desc(lang):
-        if lang == "zh":
-            return (
-                "该算子从数据库提取Schema信息并生成Text2SQL的prompt。\n\n"
-                "输入参数：\n"
-                "- database_manager：数据库管理器实例\n"
-                "- prompt_template：prompt模板，必须包含{schema}和{question}占位符\n"
-                "- schema_config：Schema配置，包含format（ddl/formatted_schema）和use_example（True/False）\n\n"
-                "输出参数：\n"
-                "- output_sft_prompt_key：生成的prompt"
-            )
-        elif lang == "en":
-            return (
-                "This operator extracts schema information from databases and generates Text2SQL prompts.\n\n"
-                "Input parameters:\n"
-                "- database_manager: Database manager instance\n"
-                "- prompt_template: Prompt template with {schema} and {question} placeholders\n"
-                "- schema_config: Schema configuration with format (ddl/formatted_schema) and use_example (True/False)\n\n"
-                "Output parameters:\n"
-                "- output_sft_prompt_key: Generated prompt"
-            )
-        else:
-            return "Database schema extractor and prompt generator for Text2SQL tasks."
 
     def run(self, storage: DataFlowStorage, 
             input_question_key: str = "question",

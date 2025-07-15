@@ -29,6 +29,31 @@ class ExecutionClassifier(OperatorABC):
         if len(self.difficulty_config['thresholds']) != len(self.difficulty_config['labels']) - 1:
             raise ValueError("Thresholds and labels configuration mismatch")
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子评估SQL的执行难度。\n\n"
+                "输入参数：\n"
+                "- input_db_id_key: 输入数据库ID列名\n"
+                "- input_sql_key: 输入SQL列名\n"
+                "- input_prompt_key: 输入prompt列名\n\n"
+                "输出参数：\n"
+                "- output_difficulty_key: 输出难度列名"
+            )
+        elif lang == "en":
+            return (
+                "This operator evaluates the execution difficulty of SQL.\n\n"
+                "Input parameters:\n"
+                "- input_db_id_key: The name of the input database ID column\n"
+                "- input_sql_key: The name of the input SQL column\n"
+                "- input_prompt_key: The name of the input prompt column\n\n"
+                "Output parameters:\n"
+                "- output_difficulty_key: The name of the output difficulty column"
+            )
+        else:
+            return "SQL execution difficulty evaluator for Text2SQL tasks."
+
     def check_column(self, dataframe):
         required_columns = [self.input_db_id_key, self.input_sql_key, self.input_prompt_key]
         missing_columns = [col for col in required_columns if col not in dataframe.columns]

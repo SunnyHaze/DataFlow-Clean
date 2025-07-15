@@ -33,6 +33,31 @@ class CoTGenerator(OperatorABC):
         self.enable_retry = enable_retry
         self._validate_config()
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子生成SQL的CoT长链路推理过程。\n\n"
+                "输入参数：\n"
+                "- input_sql_key: 输入SQL列名\n"
+                "- input_question_key: 输入问题列名\n"
+                "- input_db_id_key: 输入数据库ID列名\n\n"
+                "输出参数：\n"
+                "- output_cot_key: 输出CoT列名"
+            )
+        elif lang == "en":
+            return (
+                "This operator generates CoT for SQL with long chain reasoning.\n\n"
+                "Input parameters:\n"
+                "- input_sql_key: The name of the input SQL column\n"
+                "- input_question_key: The name of the input question column\n"
+                "- input_db_id_key: The name of the input database ID column\n\n"
+                "Output parameters:\n"
+                "- output_cot_key: The name of the output CoT column"
+            )
+        else:
+            return "CoT generator for Text2SQL tasks with long chain reasoning."
+
     def check_column(self, dataframe):
         required_columns = [self.input_sql_key, self.input_db_id_key, self.input_question_key]
         missing_columns = [col for col in required_columns if col not in dataframe.columns]

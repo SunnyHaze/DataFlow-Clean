@@ -714,6 +714,27 @@ class ComponentClassifier(OperatorABC):
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子评估SQL的组件难度。\n\n"
+                "输入参数：\n"
+                "- input_sql_key: 输入SQL列名\n\n"
+                "输出参数：\n"
+                "- output_difficulty_key: 输出难度列名"
+            )
+        elif lang == "en":
+            return (
+                "This operator evaluates the difficulty of SQL components.\n\n"
+                "Input parameters:\n"
+                "- input_sql_key: The name of the input SQL column\n\n"
+                "Output parameters:\n"
+                "- output_difficulty_key: The name of the output difficulty column"
+            )
+        else:
+            return "SQL component difficulty evaluator for Text2SQL tasks."
+
     def get_schema(self, db):
         schema = {}
         conn = sqlite3.connect(db)

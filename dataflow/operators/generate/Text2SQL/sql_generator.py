@@ -33,6 +33,25 @@ class SQLGenerator(OperatorABC):
         }
         random.seed(42)
 
+    @staticmethod
+    def get_desc(lang):
+        if lang == "zh":
+            return (
+                "该算子基于数据库信息合成SQL。\n\n"
+                "输出参数：\n"
+                "- output_sql_key: 输出SQL列名\n"
+                "- output_db_id_key: 数据库ID列名\n\n"
+            )
+        elif lang == "en":
+            return (
+                "This operator synthesizes SQL based on database information.\n\n"
+                "Output parameters:\n"
+                "- output_sql_key: The name of the output SQL column\n"
+                "- output_db_id_key: The name of the database ID column\n\n"
+            )
+        else:
+            return "SQL generator for Text2SQL tasks."
+
     def obtain_db_schema(self, db_manager: DatabaseManager, db_id: str) -> tuple:
         return db_manager.get_table_names_and_create_statements(db_id)
 
