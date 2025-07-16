@@ -43,74 +43,71 @@ class MultiHopQAGenerator(OperatorABC):
 
         Args:
             lang (str, optional): Language for description ('zh' or 'en').
-            
+
         Returns:
-            tuple: Description strings in specified language, including example
+            tuple: Description strings in specified language, including format example
         """
         if lang == "zh":
             return (
                 "MultiHopQAGenerator 是多跳问答对生成处理器，支持从文本中自动生成需要多步推理的问题与答案。",
                 "处理流程包括：文本预处理、信息抽取、问题生成与回答生成，支持自定义语言模型后端和参数。",
-                "示例：",
+                "输出格式如下：",
                 "输入：\n"
-                "文本：\"光合作用将二氧化碳转化为氧气，这一过程维持植物的生长。植物是食物链的基础。\"",
+                "text: <原始上下文文本>",
                 "输出：\n"
                 "{\n"
-                "  \"text\": \"光合作用将二氧化碳转化为氧气...\",\n"
+                "  \"text\": <处理后的文本字符串>,\n"
                 "  \"qa_pairs\": [\n"
                 "    {\n"
-                "      \"question\": \"光合作用如何影响生态系统？\",\n"
+                "      \"question\": <字符串：生成的问题>,\n"
                 "      \"reasoning_steps\": [\n"
-                "        {\"step\": \"光合作用产生氧气\"},\n"
-                "        {\"step\": \"使用光合作用的植物构成食物链基础\"}\n"
+                "        {\"step\": <推理过程的步骤 1>},\n"
+                "        {\"step\": <步骤 2>} ...\n"
                 "      ],\n"
-                "      \"answer\": \"它提供氧气并维持生态系统的食物链\",\n"
-                "      \"supporting_facts\": [\n"
-                "        \"光合作用将二氧化碳转化为氧气\",\n"
-                "        \"植物是食物链的基础\"\n"
-                "      ],\n"
-                "      \"type\": \"生物学\"\n"
-                "    }\n"
+                "      \"answer\": <字符串：最终答案>,\n"
+                "      \"supporting_facts\": [<支持该答案的事实 1>, <事实 2>, ...],\n"
+                "      \"type\": <可选：问题类型，如“生物学”、“历史”等>\n"
+                "    },\n"
+                "    ...\n"
                 "  ],\n"
                 "  \"metadata\": {\n"
-                "    \"source\": \"教材章节\",\n"
-                "    \"timestamp\": \"2024-06-01T12:00:00Z\",\n"
-                "    \"complexity\": 2\n"
+                "    \"source\": <数据来源>,\n"
+                "    \"timestamp\": <时间戳字符串>,\n"
+                "    \"complexity\": <整数：问题复杂度标记>\n"
                 "  }\n"
                 "}"
             )
-        else:  # English
+        else:
             return (
                 "MultiHopQAGenerator is a processor for generating multi-hop question-answer pairs from raw text.",
                 "It includes preprocessing, information extraction, and reasoning-based QA generation, with configurable LLM backends.",
-                "Example:",
+                "Expected output format:",
                 "Input:\n"
-                "Text: \"Photosynthesis converts CO2 to oxygen. This process sustains plant growth. Plants form the base of food chains.\"",
+                "text: <raw input context>",
                 "Output:\n"
                 "{\n"
-                "  \"text\": \"Photosynthesis converts CO2 to oxygen...\",\n"
+                "  \"text\": <processed input text>,\n"
                 "  \"qa_pairs\": [\n"
                 "    {\n"
-                "      \"question\": \"How does photosynthesis impact ecosystems?\",\n"
+                "      \"question\": <string: generated question>,\n"
                 "      \"reasoning_steps\": [\n"
-                "        {\"step\": \"Photosynthesis produces oxygen\"},\n"
-                "        {\"step\": \"Plants using photosynthesis form food chain bases\"}\n"
+                "        {\"step\": <inference step 1>},\n"
+                "        {\"step\": <inference step 2>} ...\n"
                 "      ],\n"
-                "      \"answer\": \"It provides oxygen and sustains ecosystem food chains\",\n"
-                "      \"supporting_facts\": [\n"
-                "        \"Photosynthesis converts CO2 to oxygen\",\n"
-                "        \"Plants form the base of food chains\"\n"
-                "      ],\n"
-                "      \"type\": \"biology\"\n"
-                "    }\n"
+                "      \"answer\": <string: final answer>,\n"
+                "      \"supporting_facts\": [<fact 1>, <fact 2>, ...],\n"
+                "      \"type\": <optional string: QA category>\n"
+                "    },\n"
+                "    ...\n"
                 "  ],\n"
                 "  \"metadata\": {\n"
-                "    \"source\": \"textbook_chapter\",\n"
-                "    \"timestamp\": \"2024-06-01T12:00:00Z\",\n"
-                "    \"complexity\": 2\n"
+                "    \"source\": <source string>,\n"
+                "    \"timestamp\": <timestamp string>,\n"
+                "    \"complexity\": <integer: reasoning complexity>\n"
                 "  }\n"
                 "}"
             )
+
 
         
     def process_text(
