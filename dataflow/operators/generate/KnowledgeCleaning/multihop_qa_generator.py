@@ -40,29 +40,78 @@ class MultiHopQAGenerator(OperatorABC):
     @staticmethod
     def get_desc(lang: str = "zh") -> tuple:
         """Returns a description of the processor's functionality.
-        
+
         Args:
-            lang (str, optional): Language for description ('zh' or 'en'). 
-                Defaults to None (uses instance language).
-                
+            lang (str, optional): Language for description ('zh' or 'en').
+            
         Returns:
-            tuple: Description strings in specified language
+            tuple: Description strings in specified language, including example
         """
-        
         if lang == "zh":
             return (
-                "MultiHopQAGenerator 是多跳问答对生成处理器",
-                "支持从文本数据自动生成需要多步推理的问题-答案对",
-                "包含文本预处理、信息抽取和智能问答生成全流程",
-                "支持配置语言模型服务及多种生成参数"
+                "MultiHopQAGenerator 是多跳问答对生成处理器，支持从文本中自动生成需要多步推理的问题与答案。",
+                "处理流程包括：文本预处理、信息抽取、问题生成与回答生成，支持自定义语言模型后端和参数。",
+                "示例：",
+                "输入：\n"
+                "文本：\"光合作用将二氧化碳转化为氧气，这一过程维持植物的生长。植物是食物链的基础。\"",
+                "输出：\n"
+                "{\n"
+                "  \"text\": \"光合作用将二氧化碳转化为氧气...\",\n"
+                "  \"qa_pairs\": [\n"
+                "    {\n"
+                "      \"question\": \"光合作用如何影响生态系统？\",\n"
+                "      \"reasoning_steps\": [\n"
+                "        {\"step\": \"光合作用产生氧气\"},\n"
+                "        {\"step\": \"使用光合作用的植物构成食物链基础\"}\n"
+                "      ],\n"
+                "      \"answer\": \"它提供氧气并维持生态系统的食物链\",\n"
+                "      \"supporting_facts\": [\n"
+                "        \"光合作用将二氧化碳转化为氧气\",\n"
+                "        \"植物是食物链的基础\"\n"
+                "      ],\n"
+                "      \"type\": \"生物学\"\n"
+                "    }\n"
+                "  ],\n"
+                "  \"metadata\": {\n"
+                "    \"source\": \"教材章节\",\n"
+                "    \"timestamp\": \"2024-06-01T12:00:00Z\",\n"
+                "    \"complexity\": 2\n"
+                "  }\n"
+                "}"
             )
-        else:  # Default to English
+        else:  # English
             return (
-                "MultiHopQAGenerator processes text to create multi-hop QA pairs",
-                "Automatically generates questions requiring multi-step reasoning",
-                "Handles full pipeline: text preprocessing, information extraction",
-                "and intelligent QA generation with configurable LLM backend"
+                "MultiHopQAGenerator is a processor for generating multi-hop question-answer pairs from raw text.",
+                "It includes preprocessing, information extraction, and reasoning-based QA generation, with configurable LLM backends.",
+                "Example:",
+                "Input:\n"
+                "Text: \"Photosynthesis converts CO2 to oxygen. This process sustains plant growth. Plants form the base of food chains.\"",
+                "Output:\n"
+                "{\n"
+                "  \"text\": \"Photosynthesis converts CO2 to oxygen...\",\n"
+                "  \"qa_pairs\": [\n"
+                "    {\n"
+                "      \"question\": \"How does photosynthesis impact ecosystems?\",\n"
+                "      \"reasoning_steps\": [\n"
+                "        {\"step\": \"Photosynthesis produces oxygen\"},\n"
+                "        {\"step\": \"Plants using photosynthesis form food chain bases\"}\n"
+                "      ],\n"
+                "      \"answer\": \"It provides oxygen and sustains ecosystem food chains\",\n"
+                "      \"supporting_facts\": [\n"
+                "        \"Photosynthesis converts CO2 to oxygen\",\n"
+                "        \"Plants form the base of food chains\"\n"
+                "      ],\n"
+                "      \"type\": \"biology\"\n"
+                "    }\n"
+                "  ],\n"
+                "  \"metadata\": {\n"
+                "    \"source\": \"textbook_chapter\",\n"
+                "    \"timestamp\": \"2024-06-01T12:00:00Z\",\n"
+                "    \"complexity\": 2\n"
+                "  }\n"
+                "}"
             )
+
         
     def process_text(
         self, text: str, source: str = "user_input"
