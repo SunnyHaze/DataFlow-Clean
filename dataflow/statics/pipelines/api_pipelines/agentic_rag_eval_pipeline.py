@@ -17,7 +17,7 @@ class AgenticRAGEvalPipeline():
     def __init__(self, llm_serving=None):
 
         self.storage = FileStorage(
-            first_entry_file_name="/mnt/public/data/lh/yqj/DataFlow/dataflow/example/AgenticRAGPipeline/eval_test_data.jsonl",
+            first_entry_file_name="../example_data/AgenticRAGPipeline/eval_test_data.jsonl",
             cache_path="./agenticRAG_eval_cache",
             file_name_prefix="agentic_rag_eval",
             cache_type="jsonl",
@@ -33,10 +33,7 @@ class AgenticRAGEvalPipeline():
             llm_serving=llm_serving
         )
 
-        self.task_step2 = F1Scorer(
-            prediction_key="refined_answer",
-            ground_truth_key="golden_doc_answer"
-        )
+        self.task_step2 = F1Scorer()
         
     def forward(self):
 
@@ -47,7 +44,9 @@ class AgenticRAGEvalPipeline():
 
         self.task_step2.run(
             storage=self.storage.step(),
-            output_key="F1Score"
+            output_key="F1Score",
+            prediction_key="refined_answer",
+            ground_truth_key="golden_doc_answer"
         )
 
 if __name__ == "__main__":
