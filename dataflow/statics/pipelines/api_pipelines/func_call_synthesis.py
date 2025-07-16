@@ -8,18 +8,17 @@ from dataflow.operators.conversations import (
     ParaSeqTaskGenerator,
     CompositionTaskFilter,
     FunctionGenerator,
-    MultiTurnDialogueGenerator
+    MultiTurnConversationGenerator
 )
 
 class FuncCallPipeline:
     def __init__(self):
 
         self.storage = FileStorage(
-            # first_entry_file_name="./dataflow/example/Dialogue/button_data.jsonl",
-            first_entry_file_name="part_9.json",
+            first_entry_file_name="../example_data/FuncCallPipeline/chat_data.jsonl",
             cache_path="./cache",
-            file_name_prefix="dataflow_cache_9000_step",
-            cache_type="json",
+            file_name_prefix="dataflow_cache_step",
+            cache_type="jsonl",
         )
       
         self.llm_serving = APILLMServing_request(
@@ -35,7 +34,7 @@ class FuncCallPipeline:
         self.parallel_sequential_stak_generator = ParaSeqTaskGenerator(llm_serving=self.llm_serving)
         self.composition_task_filter = CompositionTaskFilter(llm_serving=self.llm_serving)
         self.function_generator = FunctionGenerator(llm_serving=self.llm_serving)
-        self.multi_turn_conversations_generator = MultiTurnDialogueGenerator(llm_serving=self.llm_serving)
+        self.multi_turn_conversations_generator = MultiTurnConversationGenerator(llm_serving=self.llm_serving)
 
     def run(self):
        self.scenario_extractor.run(
