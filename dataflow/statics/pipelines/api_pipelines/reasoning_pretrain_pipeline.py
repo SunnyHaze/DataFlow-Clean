@@ -17,7 +17,7 @@ class ReasoningPipeline_Pretrain():
     def __init__(self, llm_serving=None):
 
         self.storage = FileStorage(
-            first_entry_file_name="../dataflow/example/ReasoningPipeline/pipeline_math_short.json",
+            first_entry_file_name="../example_data/ReasoningPipeline/pipeline_math_short.json",
             cache_path="./cache_local",
             file_name_prefix="dataflow_cache_step",
             cache_type="jsonl",
@@ -25,7 +25,7 @@ class ReasoningPipeline_Pretrain():
         if llm_serving is None:
             # use API server as LLM serving
             llm_serving = APILLMServing_request(
-                    api_url="http://123.129.219.111:3000/v1/chat/completions",
+                    api_url="http://api.openai.com/v1/chat/completions",
                     model_name="gpt-4o",
                     max_workers=100
             )

@@ -1,14 +1,15 @@
 '''
-A collection of prompts for the reasoning operator.
+A collection of prompts for the math reasoning operator.
 '''
-class AnswerGeneratorPrompt:
+
+class MathAnswerGeneratorPrompt:
     '''
     The prompt for the answer generator.
     '''
     def __init__(self):
         pass
 
-    def Classic_COT_Prompt(self, question: str) -> str:
+    def build_prompt(self, question: str) -> str:
         """
         为给定数学题目生成系统提示信息
         """
@@ -53,75 +54,16 @@ class AnswerGeneratorPrompt:
     '''
         )
         return prompt + question + r'''Your response must directly start with "Solution:" without any preamble, After the answer is generated finish your response right away.'''
-    
-class GeneralAnswerGeneratorPrompt:
-    '''
-    The prompt for the answer generator.
-    '''
-    def __init__(self):
-        pass
-
-    def Classic_COT_Prompt(self, question: str) -> str:
-        """
-        for general reasoning answer generation
-        """
-        prompt = (
-            r'''You are an intelligent chatbot designed for producing the answer to the given reasoning task.
-        Remember: DO NOT output anything else, only output the answer you generate.
-        Generate a solution to the given task strictly following this format:
-        1. Identify key components and premises of the task
-        2. Apply relevant principles, theorems, or methods with step-by-step derivation or argument
-        3. Perform any necessary calculations or logical checks with intermediate verification
-        4. Present the final answer or conclusion in a clear, unambiguous notation
-
-        Format Requirements:
-        - Prefix each step with "→" (use the actual arrow symbol, not its Unicode escape sequence)
-        - Ensure all symbols and special characters are presented using appropriate markup (e.g., LaTeX commands for mathematical symbols, code formatting for code snippets)
-
-        Example Template:
-        Task: Analyze the time complexity of the following sorting algorithm and prove its correctness.
-
-        Solution:
-        1. Identify components:
-        → Algorithm uses divide-and-conquer to split the list in half
-        → Merging step compares elements pairwise
-
-        2. Apply principles:
-        → Recurrence: T(n) = 2T(n/2) + O(n)
-        → By Master Theorem, T(n) = O(n log n)
-
-        3. Verification:
-        → Check base case T(1) = O(1)
-        → Inductive step holds for n = 2^k
-
-        4. Conclusion:
-        → The algorithm runs in \\boxed{O(n\\log n)} time and correctly sorts any input list.
-
-        Here is the given task you need to solve:
-        '''
-        )
-        return prompt + question + r'''Your response must start directly with "Solution:" without any preamble. Finish your response immediately after the solution.'''
 
 
-class DiyAnswerGeneratorPrompt:
-    def __init__(self, prompt_template):
-        self.prompt_template = prompt_template
-    
-    def Classic_COT_Prompt(self, question: str) -> str:
-        try:
-            return self.prompt_template + question + r'''Your response must start directly with "Solution:" without any preamble. Finish your response immediately after the solution.'''
-        except:
-            self.logger.debug(f"Please check if the symbol {{question}} in prompt is missing.")
-            
-            
-class QuestionSynthesisPrompt:
+class MathQuestionSynthesisPrompt:
     '''
     The prompt for the question synthesis.
     '''
     def __init__(self):
         pass
 
-    def question_synthesis_prompt(self,items, question):
+    def build_prompt(self, items: str, question: str) -> str:
         prompt = f"""
         Create a new reasonable and solvable math problem from the original problem by applying some of the following transformations(focus on all the transformations of "{items}"):
 
@@ -140,39 +82,14 @@ class QuestionSynthesisPrompt:
         """
         return prompt
     
-class GeneralQuestionSynthesisPrompt:
+class MathQuestionCategoryPrompt:
     '''
     The prompt for the question synthesis.
     '''
     def __init__(self):
         pass
 
-    def question_synthesis_prompt(self,items, question):
-        prompt = f"""
-        Create a new, high‑quality reasoning task from the original by applying some of the following transformations (focus on all transformations of "{items}"):
-
-        1. Alter any quantitative or qualitative elements (numbers, dates, variables, data types, code snippets), ensuring the new task remains coherent and solvable.
-        2. Change the task type or domain: e.g. switch from calculation to proof, from mathematical derivation to algorithm design, from text analysis to code debugging, or vice versa.
-        3. Reframe the scenario in a different real‑world or abstract context (e.g. finance, engineering, language translation, data processing, robotics), incorporating relevant domain details.
-        4. Introduce new premises or constraints that require separate consideration or conditional logic in the solution.
-        5. Increase complexity by adding multiple interdependent steps, branching cases, or requiring integration of diverse skills (e.g. math + coding + reasoning).
-        6. Vary the output format: require a formal proof, pseudocode, annotated explanation, or numeric answer as appropriate.
-
-        Here is the original task:
-        {question}
-
-        Generate a fully self‑contained new task inspired by the above. Start directly with the task statement; do NOT include any framing phrases like “Here is a new task inspired by…”. End your response immediately after the task description.
-        """
-        return prompt
-    
-class QuestionCategoryPrompt:
-    '''
-    The prompt for the question synthesis.
-    '''
-    def __init__(self):
-        pass
-
-    def question_synthesis_prompt(self, question):
+    def build_prompt(self, question: str) -> str:
         prompt = f"""
         You are a classification assistant specialized in mathematics. Your task is to classify the given text into one primary category and one secondary category according to the following taxonomy. Do not output any extra explanation. Return only a JSON object with the keys "primary_category" and "secondary_category".
 
@@ -225,14 +142,14 @@ class QuestionCategoryPrompt:
         return prompt
 
     
-class QuestionDifficultyPrompt:
+class MathQuestionDifficultyPrompt:
     '''
     The prompt for the question synthesis.
     '''
     def __init__(self):
         pass
 
-    def question_synthesis_prompt(self, question):
+    def build_prompt(self, question: str) -> str:
         prompt = r"""
         # CONTEXT #
         I am a teacher, and I have some high-level olympiad math problems. 
@@ -370,14 +287,14 @@ class QuestionDifficultyPrompt:
 
         return prompt + question
 
-class QuestionFilterPrompt:
+class MathQuestionFilterPrompt:
     '''
     The prompt for the question filter.
     '''
     def __init__(self):
         pass
     
-    def build_prompt(self, question):
+    def build_prompt(self, question: str) -> str:
         """Constructs an evaluation prompt with four progressive checks"""
         prompt = f"""You are given a mathematical problem. Follow these four steps in order and stop at the first failure:
         0. Firstly check if it is only a math problem, if it has other instruction confused the model such as "rewrite" or has answer or other strange instruction, then judged as failure. If it is not a math problem, then the judgement_test is false.
@@ -399,39 +316,3 @@ class QuestionFilterPrompt:
         -------------------------------
         """
         return prompt
-    
-class GeneralQuestionFilterPrompt:
-    def __init__(self):
-        pass
-    
-    def build_prompt(self, question):
-        prompt = f"""You are given a reasoning task. Follow these four steps in order and stop at the first failure:
-        0. First, verify the input contains only a single clear reasoning task (no extra instructions like “rewrite”, “translate”, or a provided answer); if not, output judgement_test=false.
-        1. Check spelling, grammar, and formatting (e.g. code indentation, LaTeX, Markdown), without interpreting semantics.
-        2. For each minimal premise (cannot be further decomposed), verify it does not violate commonsense, domain facts, or task requirements (e.g. “half a person” is invalid; magical operations allowed only if explicitly assumed); if invalid, fail.
-        3. Check for any contradictions among premises or in the reasoning process, or if the final result is clearly unreasonable or unsolvable; if so, fail.
-        4. If all above pass, check whether there is enough information to complete the task; missing necessary conditions ⇒ fail, redundant details are acceptable.
-
-        After these steps, output exactly:
-        {{
-            "judgement_test": true/false,
-            "error_type": "<error description or null>"
-        }}
-        You may include your chain of thought, but the final output must be the JSON above.
-
-        Here is the content to evaluate:
-        -------------------------------
-        {question}
-        -------------------------------
-        """
-        return prompt
-    
-class DiyQuestionFilterPrompt:
-    def __init__(self, prompt_template):
-        self.prompt_template = prompt_template
-    
-    def build_prompt(self, question):
-        try:
-            return self.prompt_template.format(question=question)
-        except:
-            self.logger.debug(f"Please check if the symbol {{question}} in prompt is missing.")
