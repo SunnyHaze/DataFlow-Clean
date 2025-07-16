@@ -242,7 +242,7 @@ class FunctionGenerator(OperatorABC):
         return [self.output_key]
     
 @OPERATOR_REGISTRY.register()
-class MultiTurnDialogueGenerator(OperatorABC):
+class MultiTurnConversationGenerator(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC):
         self.llm_serving = llm_serving
         self.prompt = FuncCallPrompt()
