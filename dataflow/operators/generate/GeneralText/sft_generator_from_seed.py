@@ -25,7 +25,7 @@ def extract_json_object(model_output):
 
 @OPERATOR_REGISTRY.register()
 class SFTGeneratorSeed(OperatorABC):
-    def __init__(self, llm_serving: LLMServingABC, custom_prompt="Try to make the question suitable for middle school students."):
+    def __init__(self, llm_serving: LLMServingABC, custom_prompt: str):
         self.logger = get_logger()
         self.prompts = SFTGeneratorSeedPrompt(custom_prompt=custom_prompt)    
         self.llm_serving = llm_serving
