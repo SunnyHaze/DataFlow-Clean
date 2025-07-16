@@ -232,9 +232,9 @@ class FunctionGenerator(OperatorABC):
         self.output_key = output_key
         dataframe = storage.read("dataframe")
         llm_inputs = self._reformat_prompt(dataframe)
-        self.logger.info(f"One of formatted prompts: {llm_inputs[0]}")
+        # self.logger.info(f"One of formatted prompts: {llm_inputs[0]}")
         llm_outputs = self.llm_serving.generate_from_input(llm_inputs)
-        self.logger.info(f"One of LLM outputs: {llm_outputs[0]}")
+        # self.logger.info(f"One of LLM outputs: {llm_outputs[0]}")
         dataframe[self.output_key] = llm_outputs
         storage.write(dataframe)
         output_file = storage.write(dataframe)
@@ -242,7 +242,7 @@ class FunctionGenerator(OperatorABC):
         return [self.output_key]
     
 @OPERATOR_REGISTRY.register()
-class MultiTurnDialogueGenerator(OperatorABC):
+class MultiTurnConversationGenerator(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC):
         self.llm_serving = llm_serving
         self.prompt = FuncCallPrompt()
@@ -300,7 +300,7 @@ class MultiTurnDialogueGenerator(OperatorABC):
                 if isinstance(text, str):
                     final_match = re.search(final_answer_pattern, text, re.DOTALL)
                 else:
-                    print("Warning: 'text' is not a string:", text)
+                    self.logger.warning("Warning: 'text' is not a string:", text)
                     final_match = None
                     valid_label[idx] = 1
                     continue
