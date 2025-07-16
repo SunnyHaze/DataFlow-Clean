@@ -11,6 +11,7 @@ class Dataframe_Filter():
         )
 
         self.dataframe_filter = GeneralFilter([
+                                {"op": "custom", "value": lambda df: (df["score"] > 0.8) & df["comment"].str.contains("excellent", na=False)},
                                 # { "key": "score", "op": "==", "value": 0.9 },
                                 # { "key": "score", "op": "!=", "value": 1.0 },
                                 # { "key": "score", "op": ">", "value": 0.7 },
@@ -25,7 +26,7 @@ class Dataframe_Filter():
                                 # { "key": "comment", "op": "contains", "value": "excellent" },
                                 # { "key": "comment", "op": "startswith", "value": "Good" },
                                 # { "key": "comment", "op": "endswith", "value": "done" },
-                                { "key": "remark", "op": "isna"},
+                                # { "key": "remark", "op": "isna"},
                                 # { "key": "remark", "op": "notna"}
                             ])             
 
