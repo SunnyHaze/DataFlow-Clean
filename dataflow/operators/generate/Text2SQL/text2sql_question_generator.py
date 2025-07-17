@@ -34,24 +34,24 @@ class QuestionGeneration(OperatorABC):
     def get_desc(lang):
         if lang == "zh":
             return (
-                "该算子从数据库提取Schema信息并生成Text2SQL的问题。\n\n"
+                "对于每个条目，如果自然语言问题为空，生成SQL对应的自然语言问题。为保证正确，生成多个候选问题，并选择最优的。\n\n"
                 "输入参数：\n"
-                "- input_question_key: 问题列名\n"
+                "- input_sql_key: 输入SQL列名\n"
                 "- input_db_id_key: 数据库ID列名\n\n"
                 "输出参数：\n"
                 "- output_question_key: 输出问题列名"
             )
         elif lang == "en":
             return (
-                "This operator extracts schema information from databases and generates Text2SQL questions.\n\n"
+                "This operator generates natural language questions for Text2SQL tasks if the natural language question is empty. Multiple candidate questions are generated to ensure correctness.\n\n"
                 "Input parameters:\n"
-                "- input_question_key: The name of the question column\n"
+                "- input_sql_key: The name of the input SQL column\n"
                 "- input_db_id_key: The name of the database ID column\n\n"
                 "Output parameters:\n"
                 "- output_question_key: The name of the output question column"
             )
         else:
-            return "Database schema extractor and question generator for Text2SQL tasks."
+            return "Question generator for Text2SQL tasks."
 
     def extract_column_descriptions(self, create_statements):
         column_name2column_desc = dict()
