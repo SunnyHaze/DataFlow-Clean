@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from trafilatura import fetch_url, extract
 from urllib.parse import urlparse
+from tqdm import tqdm
 
 def is_url(string):
     try:
@@ -14,59 +15,82 @@ def is_url(string):
         return all([result.scheme, result.netloc])
     except ValueError:
         return False
-    
-def _parse_pdf_to_md(
-    input_pdf_path: str, 
-    output_dir: str,      
-    lang: str = "ch",     
-    parse_method: str = "auto"  # 解析方法：auto/txt/ocr
-):
+
+
+
+def _parse_file_with_mineru(raw_file: str, output_file: str, mineru_backend: str = "vlm-sglang-engine") -> str:
     """
-    将PDF转换为Markdown（仅使用Pipeline后端）
+    Uses MinerU to parse PDF/image files (pdf/png/jpg/jpeg/webp/gif) into Markdown files.
+
+    Internally, the parsed outputs for each item are stored in a structured directory:
+    'intermediate_dir/pdf_name/MinerU_Version[mineru_backend]'.
+    This directory stores various MinerU parsing outputs, and you can customize
+    which content to extract based on your needs.
+
+    Args:
+        raw_file: Input file path, supports .pdf/.png/.jpg/.jpeg/.webp/.gif
+        output_file: Full path for the output Markdown file
+        mineru_backend: Sets the backend engine for MinerU. Options include:
+                        - "pipeline": Traditional pipeline processing (MinerU1)
+                        - "vlm-sglang-engine": New engine based on multimodal language models (MinerU2) (default recommended)
+                        Choose the appropriate backend based on your needs. Defaults to "vlm-sglang-engine".
+                        For more details, refer to the MinerU GitHub: https://github.com/opendatalab/MinerU.
+
+    Returns:
+        output_file: Path to the Markdown file
     """
+
     try:
-        from mineru.data.data_reader_writer import FileBasedDataWriter
-        from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
-        from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
-        from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-        from mineru.utils.enum_class import MakeMode
-    except:
+        import mineru
+    except ImportError:
         raise Exception(
             """
 MinerU is not installed in this environment yet.
 Please refer to https://github.com/opendatalab/mineru to install.
 Or you can just execute 'pip install mineru[pipeline]' and 'mineru-models-download' to fix this error.
-please make sure you have gpu on your machine.
+Please make sure you have GPU on your machine.
 """
         )
-    
+
     logger=get_logger()
-    # 读取PDF文件
-    pdf_bytes = Path(input_pdf_path).read_bytes()
-    pdf_name = Path(input_pdf_path).stem
+    
+    os.environ['MINERU_MODEL_SOURCE'] = "local"  # 可选：从本地加载模型
 
-    # 解析PDF
-    infer_results, all_image_lists, all_pdf_docs, _, ocr_enabled_list = pipeline_doc_analyze(
-        [pdf_bytes], [lang], parse_method=parse_method
-    )
+    MinerU_Version = {"pipeline": "auto", "vlm-sglang-engine": "vlm"}
 
-    # 准备输出目录
-    image_dir = os.path.join(output_dir, f"{pdf_name}_images")
-    os.makedirs(image_dir, exist_ok=True)
-    image_writer = FileBasedDataWriter(image_dir)
-    md_writer = FileBasedDataWriter(output_dir)
+    raw_file = Path(raw_file)
+    # import pdb; pdb.set_trace()
+    pdf_name = Path(raw_file).stem
+    intermediate_dir = output_file
+    import subprocess
 
-    # 生成中间结果和Markdown
-    middle_json = pipeline_result_to_middle_json(
-        infer_results[0], all_image_lists[0], all_pdf_docs[0], 
-        image_writer, lang, ocr_enabled_list[0], True
-    )
-    md_content = pipeline_union_make(middle_json["pdf_info"], MakeMode.MM_MD, os.path.basename(image_dir))
-    # 保存Markdown
-    md_writer.write_string(f"{pdf_name}_pdf.md", md_content)
-    logger.info(f"Markdown saved to: {os.path.join(output_dir, f'{pdf_name}_pdf.md')}")
+    command = [
+        "mineru",
+        "-p", raw_file,
+        "-o", intermediate_dir,
+        "-b", mineru_backend,
+        "--source", "local"
+    ]
 
-    return os.path.join(output_dir,f"{pdf_name}_pdf.md")
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.DEVNULL,  
+            stderr=subprocess.DEVNULL,  
+            check=True  
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to process file with MinerU: {str(e)}")
+
+    # Directory for storing raw data, including various MinerU parsing outputs.
+    # You can customize which content to extract based on your needs.
+    PerItemDir = os.path.join(intermediate_dir, pdf_name, MinerU_Version[mineru_backend])
+
+    output_file = os.path.join(PerItemDir, f"{pdf_name}.md")
+
+    logger.info(f"Markdown saved to: {output_file}")
+    return output_file
+
 
 def _parse_xml_to_md(raw_file:str=None, url:str=None, output_file:str=None):
     logger=get_logger()
@@ -90,15 +114,20 @@ def _parse_xml_to_md(raw_file:str=None, url:str=None, output_file:str=None):
 
 @OPERATOR_REGISTRY.register()
 class PDFExtractor(OperatorABC):
-    '''
-    Answer Generator is a class that generates answers for given questions.
-    '''
-    def __init__(self, intermediate_dir: str = "intermediate", lang: str = "en"):
+    """
+    mineru_backend sets the backend engine for MinerU. Options include:
+    - "pipeline": Traditional pipeline processing (MinerU1)
+    - "vlm-sglang-engine": New engine based on multimodal language models (MinerU2) (default recommended)
+    Choose the appropriate backend based on your needs.  Defaults to "vlm-sglang-engine".
+    For more details, refer to the MinerU GitHub: https://github.com/opendatalab/MinerU.
+    """
+    def __init__(self, intermediate_dir: str = "intermediate", lang: str = "en", mineru_backend: str = "vlm-sglang-engine"):
         self.logger = get_logger()
         self.intermediate_dir=intermediate_dir
         os.makedirs(self.intermediate_dir, exist_ok=True)
         self.lang=lang
-        
+        self.mineru_backend = mineru_backend
+
     @staticmethod
     def get_desc(lang: str = "zh"):
         """
@@ -131,54 +160,67 @@ class PDFExtractor(OperatorABC):
                 "- Generates intermediate files to specified directory(intermediate_dir)"
             )
 
-    def run(self, storage:DataFlowStorage, input_key: str = "raw_content", output_key: str = "text_path"):
-        self.logger.info("starting to extract...")
-        self.logger.info("If you are providing a url or a large file, this may take a while, please wait...")
-        dataframe = storage.read('dataframe')
-        self.logger.info(f"Loading, number of pdfs: {len(dataframe)}")
+    def run(self, storage: DataFlowStorage, input_key: str = "raw_content", output_key: str = "text_path"):
+        self.logger.info("Starting content extraction...")
+        self.logger.info("If the input is a URL or a large file, this process might take some time. Please wait...")
+        self.logger.info(f"Using MinerU backend: {self.mineru_backend}")
+
+        dataframe = storage.read("dataframe")
+        self.logger.info(f"Loaded dataframe with {len(dataframe)} entries.")
+
         output_file_all = []
 
-        for index, row in dataframe.iterrows():
-            content = row.get(input_key, '')
+        # Wrap iterrows with tqdm for progress tracking
+        for index, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="PDFExtractor Processing files", ncols=100):
+            content = row.get(input_key, "")
+
             if is_url(content):
-                # 保存为本地临时文件
-                local_file_path = f"./.cache/downloaded_{index}.xml"  # 可换成.pdf/.html等
+                # Case: Input is a URL
+                local_file_path = f"./.cache/downloaded_{index}.xml"
+
                 try:
                     with open(local_file_path, "w", encoding="utf-8") as f:
                         f.write(fetch_url(content))
+                    self.logger.info(f"Successfully fetched URL content: {content}")
                 except Exception as e:
                     self.logger.error(f"Failed to fetch URL: {content}, error: {e}")
+                    output_file_all.append("")
                     continue
 
                 output_file = storage.first_entry_file_name.replace(".jsonl", f"_md_{index}.md")
                 output_file = _parse_xml_to_md(raw_file=local_file_path, output_file=output_file)
-                self.logger.info(f"Primary extracted result written to: {output_file}")
+                self.logger.info(f"Extracted content saved to: {output_file}")
                 output_file_all.append(output_file)
+
             else:
+                # Case: Local file path
                 if not os.path.exists(content):
-                    output_file=""
-                    self.logger.error(f"File Not Found Error: Path {content} does not exist!")
+                    self.logger.error(f"File not found: Path {content} does not exist.")
+                    output_file_all.append("")
+                    continue
+
+                _, ext = os.path.splitext(content)
+                ext = ext.lower()
+
+                if ext in [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"]:
+                    output_file = _parse_file_with_mineru(
+                        raw_file=content,
+                        output_file=self.intermediate_dir,
+                        mineru_backend=self.mineru_backend
+                    )
+                elif ext in [".html", ".xml"]:
+                    output_file = _parse_xml_to_md(raw_file=content, output_file=output_file)
+                elif ext in [".txt", ".md"]:
+                    output_file = content  # No parsing needed for plain text or Markdown files
                 else:
-                    _, ext = os.path.splitext(content)
-                    if ext in [".pdf"]:
-                        output_file=_parse_pdf_to_md(
-                            content,
-                            self.intermediate_dir,
-                            self.lang,
-                            "txt"
-                        )
-                    #elif ext in [".doc", ".docx", ".pptx", ".ppt"]:
-                    elif ext in [".html", ".xml"]:
-                        output_file=_parse_xml_to_md(raw_file=content,output_file=output_file)
-                    elif ext in [".txt",".md"]:
-                        # for .txt and .md file, no action is taken
-                        output_file=content
-                    else:
-                        self.logger.error(f"Type Error: {ext} file is not supported for {content}")
-                        output_file = ""
+                    self.logger.error(f"Unsupported file type: {ext} for file {content}")
+                    output_file = ""
+
                 output_file_all.append(output_file)
+
+        # Save results back to storage
         dataframe[output_key] = output_file_all
         output_file_path = storage.write(dataframe)
-        self.logger.info(f"Primary extracted result written to: {output_file_path}")
-        return output_file_path
 
+        self.logger.info(f"Final extraction results saved to: {output_file_path}")
+        return output_file_path

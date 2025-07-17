@@ -8,6 +8,7 @@ from dataflow import get_logger
 from dataflow.utils.storage import DataFlowStorage
 from dataflow.core import OperatorABC
 from dataflow.core import LLMServingABC
+from dataflow.serving import LocalModelLLMServing_vllm
 
 def extract_json_object(model_output):
     """提取第一个包含 instruction 和 output 字段的 JSON 对象"""
@@ -24,17 +25,15 @@ def extract_json_object(model_output):
 
 @OPERATOR_REGISTRY.register()
 class SFTGeneratorSeed(OperatorABC):
-    def __init__(self, llm_serving: LLMServingABC):
+    def __init__(self, llm_serving: LLMServingABC, custom_prompt: str):
         self.logger = get_logger()
-        self.prompts = SFTGeneratorSeedPrompt()    
+        self.prompts = SFTGeneratorSeedPrompt(custom_prompt=custom_prompt)    
         self.llm_serving = llm_serving
-        
-        self.tokenizer = llm_serving.tokenizer
         self.max_tokens = 4096  
     
     @staticmethod
     def get_desc(lang: str = "zh"):
-        return "基于给定文档内容，生成监督微调格式的问答数据。" if lang == "zh" else "Generate supervised fine-tuning format Q&A data based on the given document content."
+        return "基于给定文档内容，生成监督微调格式的问答数据。并支持用户自定义生成内容要求。" if lang == "zh" else "Generate supervised fine-tuning format Q&A data based on the given document content and support user-defined content generation requirements."
 
     def run(self, storage: DataFlowStorage, input_key: str = "raw_content"):
         self.input_key = input_key
@@ -50,13 +49,8 @@ class SFTGeneratorSeed(OperatorABC):
         # Prepare LLM inputs by formatting the prompt with raw content from the dataframe
         for index, row in dataframe.iterrows():
             raw_content = row.get(self.input_key, '')
-            if raw_content:
-                # 对 raw_content 进行 tokenization
-                tokens = self.tokenizer.encode(raw_content, truncation=True, max_length=self.max_tokens)
-                truncated_content = self.tokenizer.decode(tokens, skip_special_tokens=True)
-                # 使用截断后的内容生成 prompt
-                llm_input = self.prompts.sft_generate_prompt(content=truncated_content)
-                llm_inputs.append(llm_input)
+            llm_input = self.prompts.sft_generate_prompt(content=raw_content)
+            llm_inputs.append(llm_input)
         
         # Generate the text using the model
         try:
