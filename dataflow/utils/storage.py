@@ -195,7 +195,7 @@ _clickhouse_clients_lock = Lock()
 SYS_FIELD_PREFIX = 'sys:'
 USER_FIELD_PREFIX = 'user:'
 
-# 获取 ClickHouse Client 单例
+# 获取 ClickHouse Client 实例
 def get_clickhouse_client(db_config):
     key = (
         db_config['host'],
