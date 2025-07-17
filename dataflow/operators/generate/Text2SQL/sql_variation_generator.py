@@ -28,14 +28,14 @@ class SQLVariationGenerator(OperatorABC):
     def get_desc(lang):
         if lang == "zh":
             return (
-                "该算子生成SQL的变种。\n\n"
+                "对于每个条目，基于已有的SQL，指导模型生成SQL的变种，即在原有SQL的基础上，进行数据替换、函数变换、难度变换等操作，生成更加丰富的SQL。\n\n"
                 "输入参数：\n"
                 "- input_sql_key: SQL列名\n"
                 "- input_db_id_key: 数据库ID列名\n\n"
             )
         elif lang == "en":
             return (
-                "This operator generates variations of SQL.\n\n"
+                "This operator generates variations of SQL based on existing SQLs, including data replacement, function transformation, and difficulty transformation, to generate more diverse SQLs.\n\n"
                 "Input parameters:\n"
                 "- input_sql_key: The name of the SQL column\n"
                 "- input_db_id_key: The name of the database ID column\n\n"
