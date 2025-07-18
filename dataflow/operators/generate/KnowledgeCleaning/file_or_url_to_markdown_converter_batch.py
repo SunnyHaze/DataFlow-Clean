@@ -176,7 +176,7 @@ class FileOrURLToMarkdownConverterBatch(OperatorABC):
         output_file_all = []
 
         # Wrap iterrows with tqdm for progress tracking
-        for index, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="PDFExtractor Processing files", ncols=100):
+        for index, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="FileOrURLToMarkdownConverter Processing files", ncols=100):
             content = row.get(input_key, "")
 
             if is_url(content):

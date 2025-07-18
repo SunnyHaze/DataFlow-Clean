@@ -183,6 +183,16 @@ class FileOrURLToMarkdownConverter(OperatorABC):
 
 
         # Handle supported file types
+        # Extract file name and extension
+        raw_file_name = os.path.splitext(os.path.basename(raw_file))[0]
+        raw_file_suffix = os.path.splitext(raw_file)[1].lower()
+        raw_file_suffix_no_dot = raw_file_suffix.lstrip(".")
+
+        # Define default output path
+        output_file = os.path.join(
+            self.intermediate_dir,
+            f"{raw_file_name}_{raw_file_suffix_no_dot}.md"
+        )
         if raw_file_suffix in [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"]:
             self.logger.info(f"Using MinerU backend: {self.mineru_backend}")
             # Use MinerU backend for PDF and image files
