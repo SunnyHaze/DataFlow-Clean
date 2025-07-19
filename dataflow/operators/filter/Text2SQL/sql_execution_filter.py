@@ -1,6 +1,8 @@
 import re
+import os
 import pandas as pd
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow import get_logger
 from dataflow.core import OperatorABC
@@ -68,32 +70,41 @@ class ExecutionFilter(OperatorABC):
                 self.logger.warning(f"Database {db_id} not found in registry, please check the database folder")
                 continue
 
-        for _, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Processing SQLs"):
+        def process_row(row):
             db_id = row[input_db_id_key]
             sql = row[input_sql_key]
-        
+
             if not self.filter_select_sql(sql):
-                continue
-            
+                return None
+
             try:
                 ans = self.database_manager.analyze_sql_execution_plan(db_id, sql, 5)
             except Exception as e:
                 self.logger.error(f"Error analyzing SQL execution plan: {e}")
-                continue
-            
+                return None
+
             if not ans['success']:
-                continue
+                return None
 
             try:
                 ans = self.database_manager.execute_query(db_id, sql, 10)
             except Exception as e:
                 self.logger.error(f"Error executing SQL query: {e}")
-                continue
-                
+                return None
+
             if not ans['success']:
-                continue
-        
-            results.append(row)
+                return None
+
+            return row
+
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            futures = [executor.submit(process_row, row) for _, row in dataframe.iterrows()]
+
+            for f in tqdm(as_completed(futures), total=len(futures), desc="Processing SQLs"):
+                r = f.result()
+                if r is not None:
+                    results.append(r)
+
         self.logger.info(f"Filter completed, remaining {len(results)} SQLs")
         result_df = pd.DataFrame(results)
         output_file = storage.write(result_df)
