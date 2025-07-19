@@ -141,10 +141,27 @@ You are using the latest version: 1.0.0.
   <img src="./static/images/text2sql.png" width="60%">
 </div>
 
-## 💐 6. 致谢
+## 📄 6. 发表论文
+
+我们团队已发表以下论文，并作为构成DataFlow系统的核心组件：
+
+| 论文标题 | DataFlow组件 | 会议 | 年份 |
+|---------|-------------|:------:|------|
+| [MM-Verify: Enhancing Multimodal Reasoning with Chain-of-Thought Verification](https://arxiv.org/pdf/2502.13383) | 多模态推理验证框架，用于数据处理和评估 | ACL | 2025 |
+| [Efficient Pretraining Data Selection for Language Models via Multi-Actor Collaboration](https://arxiv.org/pdf/2410.08102) | 多智能体协作数据选择机制，增强数据筛选和处理能力 | ACL | 2025 |
+
+**合作机构**: 
+<img src="./static/logo/pku.png" alt="PKU" height="30"/> 
+<img src="./static/logo/hkust.png" alt="HKUST" height="30"/> 
+<img src="./static/logo/CAS.png" alt="CAS" height="30"/> 
+<img src="./static/logo/shanghai_ailab.png" alt="Shanghai AI Lab" height="30"/> 
+<img src="./static/logo/baichuan.png" alt="Baichuan" height="30"/> 
+<img src="./static/logo/ant_group.png" alt="Ant Group" height="30"/>
+
+## 💐 7. 致谢
 我们衷心感谢 [MinerU](https://github.com/opendatalab/MinerU) 的卓越工作，其强大的 PDF/文档文本提取功能为数据加载提供了关键支持。
 
-## 🤝 7. 社区与支持
+## 🤝 8. 社区与支持
 
 欢迎加入 DataFlow 开源社区，提出问题、分享想法、与其他开发者一起共建项目！
 
@@ -158,7 +175,7 @@ You are using the latest version: 1.0.0.
   <img src="./static/images/community_ch.jpg" width="60%">
 </div>
 
-## 📜 8. 引用
+## 📜 9. 引用
 
 如果 DataFlow 对你的研究或项目有帮助，欢迎引用支持我们：
 
@@ -172,7 +189,7 @@ You are using the latest version: 1.0.0.
 }
 ```
 
-## 📊 9. 统计信息
+## 📊 10. 统计信息
 <div align="center">
   <a href="https://star-history.com/#OpenDCAI/DataFlow&Date">
     <picture>
