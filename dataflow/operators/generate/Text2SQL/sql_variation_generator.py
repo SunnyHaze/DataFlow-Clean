@@ -80,8 +80,9 @@ class SQLVariationGenerator(OperatorABC):
         self.check_column(dataframe)
         original_count = len(dataframe)
         prompts_and_metadata = []
+        original_row_indices = []
         
-        for _, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Generating SQL Variations"):
+        for row_idx, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Generating SQL Variations"):
             try:
                 table_names, create_statements = self.obtain_db_schema(
                     self.database_manager, row[self.input_db_id_key]
@@ -124,6 +125,7 @@ class SQLVariationGenerator(OperatorABC):
                         prompt, 
                         row[self.input_db_id_key]
                     ))
+                    original_row_indices.append(row_idx)
                     
             except Exception as e:
                 self.logger.error(f"Error processing database {row[self.input_db_id_key]}: {e}")
@@ -133,18 +135,54 @@ class SQLVariationGenerator(OperatorABC):
             try:
                 prompts = [prompt for prompt, db_id in prompts_and_metadata]
                 responses = self.llm_serving.generate_from_input(prompts, system_prompt="")
-                
-                for (prompt, db_id), response in zip(prompts_and_metadata, responses):
+                for i, ((prompt, db_id), response) in enumerate(zip(prompts_and_metadata, responses)):
                     sql = self.parse_response(response)
                     if sql:
-                        new_row = {col: None for col in dataframe.columns}
-                        new_row[self.input_db_id_key] = db_id
+                        # 获取原始行数据
+                        original_row_idx = original_row_indices[i]
+                        original_row = dataframe.iloc[original_row_idx]
+
+                        # 创建新行，复制所有原始数据
+                        new_row = original_row.copy()
+
+                        # 只更新SQL字段
                         new_row[self.input_sql_key] = sql
+
+                        # 将新行添加到dataframe中
                         dataframe = pd.concat([dataframe, pd.DataFrame([new_row])], ignore_index=True)
-                        
+
             except Exception as e:
                 self.logger.error(f"Error generating SQL variations: {e}")
                 
+        # 处理 NaN 值，防止存储时出现类型转换错误
+        for col in dataframe.columns:
+            try:
+                # 检查列是否包含 NaN 值
+                if dataframe[col].isna().any():
+                    self.logger.info(f"Processing column {col} with dtype {dataframe[col].dtype}")
+                    if dataframe[col].dtype == 'object':
+                        # 对象列，将 NaN 替换为 None
+                        dataframe[col] = dataframe[col].fillna(value=None)
+                    elif str(dataframe[col].dtype).startswith('int'):
+                        # 整数列，将 NaN 替换为0
+                        dataframe[col] = dataframe[col].fillna(value=0).astype('int64')
+                    elif str(dataframe[col].dtype).startswith('float'):
+                        # 浮点列，将 NaN 替换为0.0
+                        dataframe[col] = dataframe[col].fillna(value=0.0)
+                    else:
+                        # 其他类型，尝试用 None 填充
+                        self.logger.warning(f"Unknown dtype {dataframe[col].dtype} for column {col}, using None")
+                        dataframe[col] = dataframe[col].fillna(value=None)
+            except Exception as e:
+                self.logger.error(f"Error processing column {col}: {e}")
+                # 如果出错，尝试最简单的填充方式
+                try:
+                    dataframe[col] = dataframe[col].fillna(value=None)
+                except Exception as e2:
+                    self.logger.error(f"Failed to fill NaN in column {col}: {e2}")
+                    # 如果还是失败，跳过这个列
+                    continue
+
         output_file = storage.write(dataframe)
         self.logger.info(f"Generated {len(dataframe)} records (original: {original_count}, variations: {len(dataframe) - original_count})")
         return []
