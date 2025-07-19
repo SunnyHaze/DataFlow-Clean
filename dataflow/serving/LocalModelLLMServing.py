@@ -103,7 +103,7 @@ class LocalModelLLMServing_vllm(LLMServingABC):
         full_prompts = []
         for question in user_inputs:
             messages = [
-            {"role": "user", "content": system_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": question}
         ]
             full_prompts.append(messages)
@@ -290,7 +290,7 @@ class LocalModelLLMServing_sglang(LLMServingABC):
         full_prompts = []
         for question in user_inputs:
             messages = [
-            {"role": "user", "content": system_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": question}
         ]
             full_prompts.append(messages)
