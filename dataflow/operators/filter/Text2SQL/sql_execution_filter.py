@@ -2,7 +2,6 @@ import re
 import os
 import pandas as pd
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow import get_logger
 from dataflow.core import OperatorABC
@@ -12,8 +11,11 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 @OPERATOR_REGISTRY.register()
 class ExecutionFilter(OperatorABC):
-    def __init__(self, database_manager: DatabaseManager):
+    def __init__(self, 
+                 database_manager: DatabaseManager,
+                 timeout: int = 5):
         self.database_manager = database_manager
+        self.timeout = timeout
         self.logger = get_logger()
 
     @staticmethod
@@ -62,50 +64,52 @@ class ExecutionFilter(OperatorABC):
         self.input_db_id_key = input_db_id_key
         dataframe = storage.read("dataframe")
         self.check_column(dataframe)
-        results = []
-        self.logger.info(f"Start to filter {len(dataframe)} SQLs")
+        
         db_id_need_to_check = dataframe[input_db_id_key].unique()
         for db_id in db_id_need_to_check:
             if not self.database_manager.registry.database_exists(db_id):
                 self.logger.warning(f"Database {db_id} not found in registry, please check the database folder")
                 continue
+        
+        self.logger.info(f"Start to filter {len(dataframe)} SQLs")
 
-        def process_row(row):
-            db_id = row[input_db_id_key]
+        self.logger.info("Filtering SQLs using select component")
+        phase1_passed_indices = []
+        for idx, row in dataframe.iterrows():
             sql = row[input_sql_key]
+            if self.filter_select_sql(sql):
+                phase1_passed_indices.append(idx)
 
-            if not self.filter_select_sql(sql):
-                return None
+        self.logger.info(f"Phase 1 completed: {len(phase1_passed_indices)}/{len(dataframe)} SQLs passed initial filter")
 
-            try:
-                ans = self.database_manager.analyze_sql_execution_plan(db_id, sql, 5)
-            except Exception as e:
-                self.logger.error(f"Error analyzing SQL execution plan: {e}")
-                return None
+        infos_to_analyze = [{
+            "db_id": dataframe.loc[idx, input_db_id_key],
+            "sql": dataframe.loc[idx, input_sql_key],
+            "timeout": self.timeout,
+            "original_index": idx
+        } for idx in phase1_passed_indices]
 
-            if not ans['success']:
-                return None
+        self.logger.info("Analyzing execution plans")
+        execution_plan_results = self.database_manager.batch_analyze_execution_plans(infos_to_analyze)
 
-            try:
-                ans = self.database_manager.execute_query(db_id, sql, 10)
-            except Exception as e:
-                self.logger.error(f"Error executing SQL query: {e}")
-                return None
+        phase2_passed_infos = []
+        for info, plan_result in zip(infos_to_analyze, execution_plan_results):
+            if plan_result.success:
+                phase2_passed_infos.append(info)
 
-            if not ans['success']:
-                return None
+        self.logger.info(f"Phase 2 completed: {len(phase2_passed_infos)}/{len(infos_to_analyze)} SQLs passed execution plan analysis")
 
-            return row
+        self.logger.info("Executing queries")
+        execution_results = self.database_manager.batch_execute_queries(phase2_passed_infos)
 
-        with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            futures = [executor.submit(process_row, row) for _, row in dataframe.iterrows()]
+        final_indices = []
+        for info, exec_result in zip(phase2_passed_infos, execution_results):
+            if exec_result.success:
+                final_indices.append(info["original_index"])
 
-            for f in tqdm(as_completed(futures), total=len(futures), desc="Processing SQLs"):
-                r = f.result()
-                if r is not None:
-                    results.append(r)
+        self.logger.info(f"Filter completed, remaining {len(final_indices)} SQLs out of {len(dataframe)} original SQLs")
 
-        self.logger.info(f"Filter completed, remaining {len(results)} SQLs")
-        result_df = pd.DataFrame(results)
+        result_df = dataframe.loc[final_indices]
+        
         output_file = storage.write(result_df)
         return []
