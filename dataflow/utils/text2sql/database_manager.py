@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Union, Callable
+from typing import Dict, List, Optional, Any, Tuple
 import sqlite3
 import pymysql
 import threading
+import logging
+import copy
 import os
 import glob
 from dataclasses import dataclass
@@ -11,11 +13,9 @@ from tqdm import tqdm
 from queue import Queue, Empty
 from contextlib import contextmanager
 import time
-import asyncio
 import concurrent.futures
 import hashlib
 from enum import Enum
-import sys
 
 class OperationType(Enum):
     EXECUTE_QUERY = "execute_query"
@@ -36,7 +36,7 @@ class BatchOperation:
     db_id: str
     sql: str
     timeout: float = 2.0
-    additional_params: Optional[Dict] = None
+    additional_params: Optional[Dict[str, Any]] = None
     operation_id: Optional[str] = None
 
 @dataclass
@@ -77,71 +77,185 @@ class SQLiteConnector(DatabaseConnector):
     
     def connect(self, connection_info: Dict) -> sqlite3.Connection:
         db_path = connection_info['path']
-        return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2)
+        conn = sqlite3.connect(
+            f"file:{db_path}?mode=ro", 
+            uri=True, 
+            timeout=2,
+            check_same_thread=False 
+        )
+        conn.row_factory = sqlite3.Row
+        return conn
+    
+    def set_query_timeout(self, connection: sqlite3.Connection, timeout_seconds: float):
+        try:
+            timeout_ms = int(timeout_seconds * 1000)
+            connection.execute(f"PRAGMA busy_timeout = {timeout_ms}")
+            
+            try:
+                connection.execute(f"PRAGMA statement_timeout = {timeout_ms}")
+            except sqlite3.OperationalError:
+                pass
+                
+        except Exception as e:
+            pass
+    
+    def validate_connection(self, connection: sqlite3.Connection) -> bool:
+        try:
+            connection.execute("SELECT 1").fetchone()
+            return True
+        except (sqlite3.Error, AttributeError):
+            return False
+    
+    def execute_query_with_timeout(self, connection: sqlite3.Connection, sql: str, timeout_seconds: float) -> List:
+        import signal
+        import threading
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"Query execution exceeded {timeout_seconds} seconds")
+        
+        cursor = connection.cursor()
+        result_container = {'result': None, 'error': None, 'completed': False}
+        
+        def execute_query():
+            try:
+                cursor.execute(sql)
+                results = cursor.fetchall()
+                
+                if results and hasattr(results[0], 'keys'):
+                    result_container['result'] = [self._process_row_nulls(dict(row)) for row in results]
+                elif results:
+                    columns = [description[0] for description in cursor.description]
+                    result_container['result'] = [self._process_row_nulls(dict(zip(columns, row))) for row in results]
+                else:
+                    result_container['result'] = []
+                    
+                result_container['completed'] = True
+                
+            except Exception as e:
+                result_container['error'] = str(e)
+            finally:
+                cursor.close()
+        
+        query_thread = threading.Thread(target=execute_query, daemon=True)
+        query_thread.start()
+        query_thread.join(timeout=timeout_seconds)
+        
+        if query_thread.is_alive():
+            raise TimeoutError(f"SQLite query execution exceeded {timeout_seconds} seconds")
+        
+        if result_container['error']:
+            raise Exception(result_container['error'])
+        
+        if not result_container['completed']:
+            raise TimeoutError(f"SQLite query execution timed out after {timeout_seconds} seconds")
+        
+        return result_container['result']
+    
+    def execute_query(self, connection: sqlite3.Connection, sql: str) -> List:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(sql)
+            results = cursor.fetchall()
+            if results and hasattr(results[0], 'keys'):
+                return [self._process_row_nulls(dict(row)) for row in results]
+            elif results:
+                columns = [description[0] for description in cursor.description]
+                return [self._process_row_nulls(dict(zip(columns, row))) for row in results]
+            return []
+        finally:
+            cursor.close()
     
     def get_execution_plan(self, connection: sqlite3.Connection, sql: str) -> List[Any]:
         cursor = connection.cursor()
-        cursor.execute(f"EXPLAIN QUERY PLAN {sql}")
-        return cursor.fetchall()
-
-    def execute_query(self, connection: sqlite3.Connection, sql: str) -> List:
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        return cursor.fetchall()
+        try:
+            cursor.execute(f"EXPLAIN QUERY PLAN {sql}")
+            results = cursor.fetchall()
+            if results:
+                columns = ['id', 'parent', 'notused', 'detail']
+                return [dict(zip(columns, row)) for row in results]
+            return []
+        except Exception as e:
+            raise Exception(f"SQLite execution plan error: {e}")
+        finally:
+            cursor.close()
+    
+    def _process_row_nulls(self, row_dict: dict) -> dict:
+        processed = {}
+        for key, value in row_dict.items():
+            if value is None:
+                processed[key] = None
+            elif isinstance(value, str) and value.lower() in ('null', ''):
+                processed[key] = None
+            else:
+                processed[key] = value
+        return processed
     
     def get_tables(self, connection: sqlite3.Connection) -> List[str]:
         cursor = connection.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-        return [row[0] for row in cursor.fetchall()]
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            cursor.close()
     
     def get_table_schema(self, connection: sqlite3.Connection, table_name: str) -> Dict:
         cursor = connection.cursor()
-        
-        cursor.execute(f"PRAGMA table_info([{table_name}])")
-        columns = cursor.fetchall()
-        
-        schema = {
-            'columns': {},
-            'primary_keys': [],
-            'foreign_keys': []
-        }
-        
-        for col_info in columns:
-            col_name = col_info[1]
-            col_type = col_info[2]
-            is_pk = col_info[5]
+        try:
+            cursor.execute(f"PRAGMA table_info([{table_name}])")
+            columns = cursor.fetchall()
             
-            schema['columns'][col_name] = {
-                'type': self._normalize_type(col_type),
-                'raw_type': col_type
+            schema = {
+                'columns': {},
+                'primary_keys': [],
+                'foreign_keys': []
             }
             
-            if is_pk:
-                schema['primary_keys'].append(col_name)
-        
-        cursor.execute(f"PRAGMA foreign_key_list([{table_name}])")
-        foreign_keys = cursor.fetchall()
-        
-        for fk in foreign_keys:
-            schema['foreign_keys'].append({
-                'column': fk[3],
-                'referenced_table': fk[2],
-                'referenced_column': fk[4]
-            })
-        
-        return schema
+            for col_info in columns:
+                col_name = col_info[1]
+                col_type = col_info[2]
+                is_pk = col_info[5]
+                
+                schema['columns'][col_name] = {
+                    'type': self._normalize_type(col_type),
+                    'raw_type': col_type
+                }
+                
+                if is_pk:
+                    schema['primary_keys'].append(col_name)
+            
+            cursor.execute(f"PRAGMA foreign_key_list([{table_name}])")
+            foreign_keys = cursor.fetchall()
+            
+            for fk in foreign_keys:
+                schema['foreign_keys'].append({
+                    'column': fk[3],
+                    'referenced_table': fk[2],
+                    'referenced_column': fk[4]
+                })
+            
+            return schema
+        finally:
+            cursor.close()
     
     def get_sample_data(self, connection: sqlite3.Connection, table_name: str, limit: int) -> Dict[str, Any]:
         cursor = connection.cursor()
-        cursor.execute(f'SELECT * FROM "{table_name}" LIMIT {limit}')
-        rows = cursor.fetchall()
-        
-        column_names = [description[0] for description in cursor.description]
-        
-        return {
-            'columns': column_names,
-            'rows': rows
-        }
+        try:
+            cursor.execute(f'SELECT * FROM "{table_name}" LIMIT {limit}')
+            rows = cursor.fetchall()
+            
+            column_names = [description[0] for description in cursor.description]
+            
+            if rows and hasattr(rows[0], 'keys'):
+                dict_rows = [dict(row) for row in rows]
+            else:
+                dict_rows = [dict(zip(column_names, row)) for row in rows]
+            
+            return {
+                'columns': column_names,
+                'rows': dict_rows
+            }
+        finally:
+            cursor.close()
     
     def _normalize_type(self, db_type: str) -> str:
         if not db_type:
@@ -164,6 +278,54 @@ class MySQLConnector(DatabaseConnector):
     
     def connect(self, connection_info: Dict) -> pymysql.Connection:
         return pymysql.connect(**connection_info, connect_timeout=2)
+    
+    def set_query_timeout(self, connection: pymysql.Connection, timeout_seconds: float):
+        try:
+            cursor = connection.cursor()
+            timeout_ms = int(timeout_seconds * 1000)
+            cursor.execute(f"SET SESSION max_execution_time = {timeout_ms}")
+            cursor.close()
+        except Exception as e:
+            pass
+    
+    def execute_query_with_timeout(self, connection: pymysql.Connection, sql: str, timeout_seconds: float) -> List:
+        import threading
+        
+        result_container = {'result': None, 'error': None, 'completed': False}
+        
+        def execute_query():
+            cursor = None
+            try:
+                cursor = connection.cursor(pymysql.cursors.DictCursor)
+                cursor.execute(sql)
+                result_container['result'] = cursor.fetchall()
+                result_container['completed'] = True
+            except Exception as e:
+                result_container['error'] = str(e)
+            finally:
+                if cursor:
+                    cursor.close()
+        
+        query_thread = threading.Thread(target=execute_query, daemon=True)
+        query_thread.start()
+        query_thread.join(timeout=timeout_seconds)
+        
+        if query_thread.is_alive():
+            try:
+                connection.cancel()
+            except:
+                pass
+            raise TimeoutError(f"MySQL query execution exceeded {timeout_seconds} seconds")
+        
+        if result_container['error']:
+            if 'max_execution_time' in result_container['error'].lower():
+                raise TimeoutError(f"MySQL query execution exceeded {timeout_seconds} seconds")
+            raise Exception(result_container['error'])
+        
+        if not result_container['completed']:
+            raise TimeoutError(f"MySQL query execution timed out after {timeout_seconds} seconds")
+        
+        return result_container['result']
 
     def get_execution_plan(self, connection: pymysql.Connection, sql: str) -> List[Any]:
         cursor = connection.cursor()
@@ -279,108 +441,25 @@ class DatabaseRegistry:
 
 class CacheManager:
     
-    def __init__(self, max_size: int = 2000, ttl: int = 3600):
+    def __init__(self, max_size: int = 100, ttl: int = 1800):
         self.max_size = max_size
         self.ttl = ttl
-        self._max_similar_queries = 10 
         
         self._schema_cache: Dict[str, Dict] = {}
-        self._query_result_cache: Dict[str, Dict] = {}
-        self._execution_plan_cache: Dict[str, List] = {}
         self._table_info_cache: Dict[str, Dict] = {}
-        
+        self._query_result_cache: Dict[str, Dict] = {}
         self._access_times: Dict[str, float] = {}
         self._lock = threading.RLock()
+        
+        self._hit_counts = {'schema': 0, 'table': 0, 'query': 0}
+        self._total_requests = {'schema': 0, 'table': 0, 'query': 0}
 
-        self._query_pattern_cache: Dict[str, Dict] = {}
-        self._similar_query_cache: Dict[str, List[Dict]] = {}
-        
-        self._hit_counts = {
-            'schema': 0, 'query': 0, 'plan': 0, 'table': 0
-        }
-        self._total_requests = {
-            'schema': 0, 'query': 0, 'plan': 0, 'table': 0
-        }
-
-    def _normalize_sql(self, sql: str) -> str:
-        """规范化SQL以识别相似查询"""
-        import re
-        sql = re.sub(r'\s+', ' ', sql.strip().lower())
-        sql = re.sub(r'--.*?\n', '', sql)
-        sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
-        return sql
-
-    def get_query_result_smart(self, db_id: str, sql: str) -> Optional[Dict]:
-        # 先尝试精确匹配
-        exact_result = self.get_query_result(db_id, sql)
-        if exact_result:
-            return exact_result
-        
-        # 尝试相似查询匹配
-        normalized_sql = self._normalize_sql(sql)
-        cache_key = self._generate_cache_key("similar", db_id, normalized_sql)
-        
-        with self._lock:
-            if cache_key in self._similar_query_cache:
-                for item in self._similar_query_cache[cache_key]:
-                    if item['normalized'] == normalized_sql:
-                        similar_result = self.get_query_result(db_id, item['original'])
-                        if similar_result:
-                            return similar_result
-        
-        return None
-    
-    def set_query_result_smart(self, db_id: str, sql: str, result: Dict):
-        """智能设置查询结果，限制相似查询数量"""
-        self.set_query_result(db_id, sql, result)
-        
-        normalized_sql = self._normalize_sql(sql)
-        cache_key = self._generate_cache_key("similar", db_id, normalized_sql)
-        
-        with self._lock:
-            if cache_key not in self._similar_query_cache:
-                self._similar_query_cache[cache_key] = []
-            
-            # 检查是否已存在相同的规范化SQL
-            existing = any(item['normalized'] == normalized_sql 
-                          for item in self._similar_query_cache[cache_key])
-            
-            if not existing:
-                self._similar_query_cache[cache_key].append({
-                    'normalized': normalized_sql,
-                    'original': sql
-                })
-                
-                # 限制数量
-                if len(self._similar_query_cache[cache_key]) > self._max_similar_queries:
-                    self._similar_query_cache[cache_key].pop(0)
-        
     def _generate_cache_key(self, prefix: str, *args) -> str:
         key_parts = [prefix] + [str(arg).replace('|', '\\|') for arg in args]
         key_string = '|'.join(key_parts)
         return f"{prefix}:{hashlib.md5(key_string.encode()).hexdigest()[:16]}"
     
-    def _safe_deep_copy(self, data: Any) -> Any:
-        """安全的深拷贝，处理各种数据类型"""
-        try:
-            if isinstance(data, dict):
-                return {k: self._safe_deep_copy(v) for k, v in data.items()}
-            elif isinstance(data, list):
-                return [self._safe_deep_copy(item) for item in data]
-            elif isinstance(data, tuple):
-                return tuple(self._safe_deep_copy(item) for item in data)
-            elif isinstance(data, (str, int, float, bool, type(None))):
-                return data
-            else:
-                # 对于其他类型，尝试使用copy.deepcopy
-                import copy
-                return copy.deepcopy(data)
-        except Exception:
-            # 如果深拷贝失败，返回原对象
-            return data
-    
     def _get_from_cache(self, cache_dict: Dict, cache_key: str, cache_type: str) -> Optional[Any]:
-        """通用缓存获取方法"""
         with self._lock:
             self._total_requests[cache_type] += 1
             
@@ -391,33 +470,37 @@ class CacheManager:
                 
                 self._access_times[cache_key] = time.time()
                 self._hit_counts[cache_type] += 1
-                
-                # 使用安全的深拷贝
-                return self._safe_deep_copy(cache_dict[cache_key])
+                return copy.deepcopy(cache_dict[cache_key])
             return None
     
     def _set_to_cache(self, cache_dict: Dict, cache_key: str, data: Any):
-        """通用缓存设置方法"""
         with self._lock:
-            if len(cache_dict) >= self.max_size // 4:
-                oldest_keys = sorted(
-                    [k for k in cache_dict.keys() if k in self._access_times],
-                    key=lambda k: self._access_times[k]
-                )[:len(cache_dict) // 4]
-                
-                for old_key in oldest_keys:
-                    self._remove_from_cache(cache_dict, old_key)
+            if len(cache_dict) >= self.max_size:
+                self._cleanup_lru_cache(cache_dict)
             
-            # 使用安全的深拷贝存储数据
-            cache_dict[cache_key] = self._safe_deep_copy(data)
+            cache_dict[cache_key] = copy.deepcopy(data)
             self._access_times[cache_key] = time.time()
     
+    def _cleanup_lru_cache(self, cache_dict: Dict, cleanup_ratio: float = 0.25):
+        if not cache_dict:
+            return
+        
+        cleanup_count = max(1, int(len(cache_dict) * cleanup_ratio))
+        
+        cache_keys = list(cache_dict.keys())
+        oldest_keys = sorted(
+            [k for k in cache_keys if k in self._access_times],
+            key=lambda k: self._access_times[k]
+        )[:cleanup_count]
+        
+        for old_key in oldest_keys:
+            cache_dict.pop(old_key, None)
+            self._access_times.pop(old_key, None)
+    
     def _remove_from_cache(self, cache_dict: Dict, cache_key: str):
-        """从缓存中移除"""
         cache_dict.pop(cache_key, None)
         self._access_times.pop(cache_key, None)
     
-    # Schema 缓存
     def get_schema(self, db_id: str, db_type: str) -> Optional[Dict]:
         cache_key = self._generate_cache_key("schema", db_id, db_type)
         return self._get_from_cache(self._schema_cache, cache_key, 'schema')
@@ -426,25 +509,6 @@ class CacheManager:
         cache_key = self._generate_cache_key("schema", db_id, db_type)
         self._set_to_cache(self._schema_cache, cache_key, schema)
     
-    # 查询结果缓存
-    def get_query_result(self, db_id: str, sql: str) -> Optional[Dict]:
-        cache_key = self._generate_cache_key("query", db_id, sql)
-        return self._get_from_cache(self._query_result_cache, cache_key, 'query')
-    
-    def set_query_result(self, db_id: str, sql: str, result: Dict):
-        cache_key = self._generate_cache_key("query", db_id, sql)
-        self._set_to_cache(self._query_result_cache, cache_key, result)
-    
-    # 执行计划缓存
-    def get_execution_plan(self, db_id: str, sql: str) -> Optional[List]:
-        cache_key = self._generate_cache_key("plan", db_id, sql)
-        return self._get_from_cache(self._execution_plan_cache, cache_key, 'plan')
-    
-    def set_execution_plan(self, db_id: str, sql: str, plan: List):
-        cache_key = self._generate_cache_key("plan", db_id, sql)
-        self._set_to_cache(self._execution_plan_cache, cache_key, plan)
-    
-    # 表信息缓存
     def get_table_info(self, db_id: str, table_name: str) -> Optional[Dict]:
         cache_key = self._generate_cache_key("table", db_id, table_name)
         return self._get_from_cache(self._table_info_cache, cache_key, 'table')
@@ -453,15 +517,19 @@ class CacheManager:
         cache_key = self._generate_cache_key("table", db_id, table_name)
         self._set_to_cache(self._table_info_cache, cache_key, info)
     
+    def get_query_result(self, db_id: str, query_key: str) -> Optional[Dict]:
+        cache_key = self._generate_cache_key("query", db_id, query_key)
+        return self._get_from_cache(self._query_result_cache, cache_key, 'query')
+    
+    def set_query_result(self, db_id: str, query_key: str, result: Dict):
+        cache_key = self._generate_cache_key("query", db_id, query_key)
+        self._set_to_cache(self._query_result_cache, cache_key, result)
+    
     def clear_all(self):
-        """清空所有缓存"""
         with self._lock:
             self._schema_cache.clear()
-            self._query_result_cache.clear()
-            self._execution_plan_cache.clear()
             self._table_info_cache.clear()
-            self._query_pattern_cache.clear()
-            self._similar_query_cache.clear()
+            self._query_result_cache.clear()
             self._access_times.clear()
             
             for key in self._hit_counts:
@@ -469,57 +537,26 @@ class CacheManager:
                 self._total_requests[key] = 0
     
     def get_cache_stats(self) -> Dict[str, Any]:
-        """获取缓存统计信息"""
         with self._lock:
-            total_size = (len(self._schema_cache) + len(self._query_result_cache) + 
-                        len(self._execution_plan_cache) + len(self._table_info_cache) +
-                        len(self._query_pattern_cache) + len(self._similar_query_cache))
-            
             hit_rates = {}
             for cache_type in self._hit_counts:
                 total_req = self._total_requests[cache_type]
                 hit_rates[cache_type] = self._hit_counts[cache_type] / max(total_req, 1)
             
             return {
-                'total_size': total_size,
-                'max_size': self.max_size,
                 'cache_sizes': {
                     'schema': len(self._schema_cache),
-                    'query': len(self._query_result_cache),
-                    'plan': len(self._execution_plan_cache),
                     'table': len(self._table_info_cache),
-                    'pattern': len(self._query_pattern_cache),
-                    'similar': len(self._similar_query_cache)
+                    'query': len(self._query_result_cache)
                 },
+                'max_size': self.max_size,
                 'hit_rates': hit_rates,
-                'memory_usage_estimate': self._estimate_memory_usage()
+                'total_requests': dict(self._total_requests)
             }
 
-    def _estimate_memory_usage(self) -> Dict[str, int]:
-        """估算内存使用量"""
-        def get_size(obj):
-            try:
-                if isinstance(obj, dict):
-                    return sum(sys.getsizeof(k) + get_size(v) for k, v in obj.items()) + sys.getsizeof(obj)
-                elif isinstance(obj, (list, tuple)):
-                    return sum(get_size(item) for item in obj) + sys.getsizeof(obj)
-                else:
-                    return sys.getsizeof(obj)
-            except:
-                return sys.getsizeof(obj)
-            
-        with self._lock:
-            return {
-                'schema_cache': sum(get_size(v) for v in self._schema_cache.values()),
-                'query_cache': sum(get_size(v) for v in self._query_result_cache.values()),
-                'plan_cache': sum(get_size(v) for v in self._execution_plan_cache.values()),
-                'table_cache': sum(get_size(v) for v in self._table_info_cache.values()),
-                'pattern_cache': sum(get_size(v) for v in self._query_pattern_cache.values()),
-                'similar_cache': sum(get_size(v) for v in self._similar_query_cache.values()),
-                'access_times': get_size(self._access_times)
-            }
 
 class ConnectionPool:
+    
     def __init__(self, connector, connection_info, max_connections=10, max_idle_time=300):
         self.connector = connector
         self.connection_info = connection_info
@@ -528,127 +565,156 @@ class ConnectionPool:
         
         self._pool = Queue(maxsize=max_connections)
         self._active_connections = 0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._connection_times = {}
+        self._closed = False
+        
+        self.logger = logging.getLogger(__name__)
+        
+        self.is_sqlite = isinstance(connector, SQLiteConnector)
+        if self.is_sqlite:
+            self.max_connections = min(3, max_connections)
+            self._sqlite_connections = {}
+            self._sqlite_lock = threading.Lock()
 
     @contextmanager
     def get_connection(self):
+        if self._closed:
+            raise RuntimeError("Connection pool is closed")
+        
+        thread_id = threading.current_thread().ident
         conn = None
         conn_created = False
+        conn_id = None
+        
         try:
-            # 尝试从池中获取连接
-            try:
-                conn_info = self._pool.get_nowait()
-                conn = conn_info['connection']
-                if not self._is_connection_valid(conn):
-                    self._close_connection_safely(conn)
-                    conn = None
-            except Empty:
-                pass
-            
-            # 如果没有可用连接，创建新连接
-            if conn is None:
-                with self._lock:
-                    if self._active_connections < self.max_connections:
-                        try:
+            if self.is_sqlite:
+                with self._sqlite_lock:
+                    if thread_id in self._sqlite_connections:
+                        conn = self._sqlite_connections[thread_id]
+                        if not self.connector.validate_connection(conn):
+                            self._close_connection_safely(conn)
+                            del self._sqlite_connections[thread_id]
+                            conn = None
+                    
+                    if conn is None:
+                        conn = self.connector.connect(self.connection_info)
+                        self._sqlite_connections[thread_id] = conn
+                        conn_created = True
+                        conn_id = thread_id
+                
+                yield conn
+                
+            else:
+                try:
+                    conn_info = self._pool.get_nowait()
+                    conn = conn_info['connection']
+                    conn_id = conn_info.get('id')
+                    
+                    if not self.connector.validate_connection(conn):
+                        self._close_connection_safely(conn)
+                        conn = None
+                        if conn_id:
+                            self._connection_times.pop(conn_id, None)
+                            
+                except Empty:
+                    pass
+                
+                if conn is None:
+                    with self._lock:
+                        if self._active_connections < self.max_connections and not self._closed:
                             conn = self.connector.connect(self.connection_info)
                             self._active_connections += 1
                             conn_created = True
-                        except Exception as e:
-                            raise Exception(f"Failed to create connection: {str(e)}")
-                    else:
-                        # 等待可用连接
-                        try:
-                            conn_info = self._pool.get(timeout=5)
+                            conn_id = id(conn)
+                            self._connection_times[conn_id] = time.time()
+                        else:
+                            if self._closed:
+                                raise RuntimeError("Connection pool is closed")
+                            conn_info = self._pool.get(timeout=10)
                             conn = conn_info['connection']
-                            if not self._is_connection_valid(conn):
+                            conn_id = conn_info.get('id')
+                            
+                            if not self.connector.validate_connection(conn):
                                 self._close_connection_safely(conn)
+                                if conn_id:
+                                    self._connection_times.pop(conn_id, None)
                                 raise Exception("No valid connections available")
-                        except Empty:
-                            raise Exception("Connection pool exhausted, timeout waiting for connection")
-            
-            yield conn
-            
+                
+                yield conn
+                
         except Exception as e:
-            # 如果连接有问题，不要放回池中
-            if conn and not self._is_connection_valid(conn):
-                self._close_connection_safely(conn)
-                if conn_created:
-                    with self._lock:
-                        self._active_connections -= 1
-                conn = None
-            raise e
-        finally:
+            self.logger.error(f"Connection error for thread {thread_id}: {e}")
             if conn:
-                try:
-                    # 连接正常，放回池中
-                    self._pool.put_nowait({
-                        'connection': conn,
-                        'last_used': time.time()
-                    })
-                except:
-                    # 池已满，关闭连接
+                if self.is_sqlite:
+                    with self._sqlite_lock:
+                        if thread_id in self._sqlite_connections:
+                            self._close_connection_safely(self._sqlite_connections[thread_id])
+                            del self._sqlite_connections[thread_id]
+                elif not self.connector.validate_connection(conn):
                     self._close_connection_safely(conn)
                     if conn_created:
                         with self._lock:
                             self._active_connections -= 1
-    
-    def _is_connection_valid(self, conn, timeout=2.0) -> bool:
-        """检查连接是否有效，添加超时机制"""
-        if conn is None:
-            return False
-        
-        def check_conn():
-            try:
-                # 不同数据库的连接检查方法
-                if hasattr(conn, 'ping'):
-                    # MySQL连接
-                    conn.ping(reconnect=False)
-                    return True
-                elif hasattr(conn, 'execute'):
-                    # SQLite连接
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT 1")
-                    cursor.close()
-                    return True
-                else:
-                    # 通用检查
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT 1")
-                    cursor.close()
-                    return True
-            except Exception:
-                return False
-        
-        # 使用线程和超时来检查连接
-        result = [False]
-        
-        def check_thread():
-            result[0] = check_conn()
-        
-        thread = threading.Thread(target=check_thread)
-        thread.daemon = True
-        thread.start()
-        thread.join(timeout)
-        
-        if thread.is_alive():
-            # 超时，认为连接无效
-            return False
-        
-        return result[0]
-    
+                    if conn_id:
+                        self._connection_times.pop(conn_id, None)
+                conn = None
+            raise e
+        finally:
+            if conn and not self._closed and not self.is_sqlite:
+                try:
+                    self._pool.put_nowait({
+                        'connection': conn,
+                        'last_used': time.time(),
+                        'id': conn_id
+                    })
+                except:
+                    self._close_connection_safely(conn)
+                    if conn_created:
+                        with self._lock:
+                            self._active_connections -= 1
+                    if conn_id:
+                        self._connection_times.pop(conn_id, None)
+
     def _close_connection_safely(self, conn):
-        """安全关闭连接"""
         try:
-            if conn:
+            if conn and hasattr(conn, 'close'):
                 conn.close()
         except Exception:
-            pass  # 忽略关闭时的异常
+            pass
     
+    def close_all(self):
+        self._closed = True
+        closed_count = 0
+        
+        if self.is_sqlite:
+            with self._sqlite_lock:
+                for thread_id, conn in self._sqlite_connections.items():
+                    self._close_connection_safely(conn)
+                    closed_count += 1
+                self._sqlite_connections.clear()
+        
+        while True:
+            try:
+                conn_info = self._pool.get_nowait()
+                self._close_connection_safely(conn_info['connection'])
+                closed_count += 1
+            except Empty:
+                break
+        
+        with self._lock:
+            self._active_connections = 0
+            self._connection_times.clear()
+        
+        return closed_count
+
     def cleanup_idle_connections(self):
-        """清理空闲连接"""
+        if self._closed or self.is_sqlite:
+            return 0
+            
         current_time = time.time()
         active_connections = []
+        cleaned_count = 0
         
         while True:
             try:
@@ -657,45 +723,41 @@ class ConnectionPool:
                     self._close_connection_safely(conn_info['connection'])
                     with self._lock:
                         self._active_connections -= 1
+                    conn_id = conn_info.get('id')
+                    if conn_id:
+                        self._connection_times.pop(conn_id, None)
+                    cleaned_count += 1
                 else:
                     active_connections.append(conn_info)
             except Empty:
                 break
         
-        # 将仍然活跃的连接放回池中
         for conn_info in active_connections:
             try:
                 self._pool.put_nowait(conn_info)
             except:
-                # 如果放不回去，关闭连接
                 self._close_connection_safely(conn_info['connection'])
                 with self._lock:
                     self._active_connections -= 1
-    
-    def close_all(self):
-        """关闭所有连接"""
-        while True:
-            try:
-                conn_info = self._pool.get_nowait()
-                self._close_connection_safely(conn_info['connection'])
-            except Empty:
-                break
+                conn_id = conn_info.get('id')
+                if conn_id:
+                    self._connection_times.pop(conn_id, None)
         
-        with self._lock:
-            self._active_connections = 0
+        return cleaned_count
     
     def get_stats(self) -> dict:
-        """获取连接池统计信息"""
         with self._lock:
             return {
                 'active_connections': self._active_connections,
                 'max_connections': self.max_connections,
                 'pool_size': self._pool.qsize(),
-                'pool_utilization': self._active_connections / self.max_connections
+                'pool_utilization': self._active_connections / self.max_connections if self.max_connections > 0 else 0,
+                'closed': self._closed,
+                'is_sqlite': self.is_sqlite
             }
 
+
 class BatchOperationExecutor:
-    """批量操作执行器 - 重构版本"""
     
     def __init__(self, registry, cache, connectors, connection_pool_getter, logger, shared_executor=None):
         self.registry = registry
@@ -706,81 +768,190 @@ class BatchOperationExecutor:
         
         self.executor = shared_executor
         self._own_executor = shared_executor is None
+        self._closed = False
+        self._progress_bar = None
+        self._progress_lock = threading.Lock()
         
         if self.executor is None:
-            self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count())
+            max_workers = min(8, (os.cpu_count() or 1) + 2)
+            self.executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=max_workers,
+                thread_name_prefix="BatchExecutor"
+            )
     
-    def execute_batch_operations(self, operations: List[BatchOperation]) -> List[BatchResult]:
+    def execute_batch_operations(self, operations: List[BatchOperation], show_progress: bool = True) -> List[BatchResult]:
+        if self._closed:
+            raise RuntimeError("BatchOperationExecutor is closed")
+            
         if not operations:
             return []
-        
-        # 按数据库ID分组操作
+
         operations_by_db = {}
         for op in operations:
             if op.db_id not in operations_by_db:
                 operations_by_db[op.db_id] = []
             operations_by_db[op.db_id].append(op)
         
-        # 提交任务到线程池
-        if self.executor is None:
-            raise RuntimeError("Executor is not initialized.")
+        if show_progress:
+            self._progress_bar = tqdm(
+                total=len(operations),
+                desc="Executing SQL operations",
+                unit="ops",
+                ncols=100,
+                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]'
+            )
         
-        futures = [
-            self.executor.submit(self._execute_db_operations, db_id, db_operations)
-            for db_id, db_operations in operations_by_db.items()
-        ]
-        
-        # 收集结果
-        all_results = []
-        for future in concurrent.futures.as_completed(futures, timeout=30):
+        try:
+            future_to_operations = {}
+            for db_id, db_operations in operations_by_db.items():
+                future = self.executor.submit(self._execute_db_operations, db_id, db_operations)
+                future_to_operations[future] = db_operations
+            
+            all_results = []
+            completed_futures = set()
+            
+            total_ops = len(operations)
+            timeout = min(300, max(60, total_ops * 0.5))
+            
+            # self.logger.info(f"Batch operation timeout set to {timeout}s for {total_ops} operations")
+            
+            start_time = time.time()
+            
             try:
-                results = future.result()
-                all_results.extend(results)
+                for future in concurrent.futures.as_completed(future_to_operations.keys(), timeout=timeout):
+                    completed_futures.add(future)
+                    try:
+                        results = future.result()
+                        all_results.extend(results)
+                        
+                        if show_progress and self._progress_bar:
+                            with self._progress_lock:
+                                self._progress_bar.update(len(results))
+                                
+                                success_count = sum(1 for r in results if r.success)
+                                timeout_count = sum(1 for r in results if not r.success and 'timeout' in r.error.lower())
+                                self._progress_bar.set_postfix({
+                                    'Success': success_count,
+                                    'Timeout': timeout_count,
+                                    'Failed': len(results) - success_count
+                                })
+                        
+                        elapsed = time.time() - start_time
+                        # self.logger.info(f"Completed batch for database, got {len(results)} results. Total elapsed: {elapsed:.2f}s")
+                    except Exception as e:
+                        self.logger.error(f"Error in batch operation: {e}")
+                        operations = future_to_operations[future]
+                        for op in operations:
+                            all_results.append(BatchResult(
+                                operation_id=op.operation_id or f"{op.operation_type.value}_{hash(op.sql)}",
+                                success=False,
+                                error=f"Batch execution error: {str(e)}"
+                            ))
+                        
+                        if show_progress and self._progress_bar:
+                            with self._progress_lock:
+                                self._progress_bar.update(len(operations))
+                                
             except concurrent.futures.TimeoutError:
-                all_results.append(BatchResult(
-                    operation_id="timeout",
-                    success=False,
-                    error="Batch operation timeout"
-                ))
-            except Exception as e:
-                self.logger.error(f"Batch operation error: {e}")
-                all_results.append(BatchResult(
-                    operation_id="error",
-                    success=False,
-                    error=str(e)
-                ))
-        
-        return all_results
+                elapsed = time.time() - start_time
+                self.logger.warning(f"Batch operation timeout after {timeout}s (actual: {elapsed:.2f}s)")
+            
+            unfinished_futures = set(future_to_operations.keys()) - completed_futures
+            for future in unfinished_futures:
+                future.cancel()
+                operations = future_to_operations[future]
+                for op in operations:
+                    all_results.append(BatchResult(
+                        operation_id=op.operation_id or f"{op.operation_type.value}_{hash(op.sql)}",
+                        success=False,
+                        error="Operation timeout or cancelled"
+                    ))
+                
+                if show_progress and self._progress_bar:
+                    with self._progress_lock:
+                        self._progress_bar.update(len(operations))
+            
+            success_count = sum(1 for r in all_results if r.success)
+            self.logger.info(f"Batch execution completed: {success_count}/{len(all_results)} operations succeeded")
+            
+            return all_results
+            
+        finally:
+            if show_progress and self._progress_bar:
+                self._progress_bar.close()
+                self._progress_bar = None
 
     def _execute_db_operations(self, db_id: str, operations: List[BatchOperation]) -> List[BatchResult]:
-        """在单个数据库上执行一批操作"""
         try:
-            # 使用传入的函数获取连接池
             pool = self.get_connection_pool(db_id)
             db_info = self.registry.get_database(db_id)
-            connector = self.connectors[db_info.db_type]
+            
+            if not db_info:
+                raise ValueError(f"Database {db_id} not found")
+                
+            connector = self.connectors.get(db_info.db_type)
+            if not connector:
+                raise ValueError(f"No connector found for database type: {db_info.db_type}")
             
             results = []
+            connection_start = time.time()
+            unified_timeout = operations[0].timeout if operations else 30.0
             
-            # 使用单个连接执行所有操作
             with pool.get_connection() as conn:
-                for op in operations:
+                connection_time = time.time() - connection_start
+                self.logger.info(f"Got connection for {db_id} in {connection_time:.2f}s, executing {len(operations)} operations with timeout {unified_timeout}s")
+                
+                if hasattr(connector, 'set_query_timeout'):
                     try:
-                        start_time = time.time()
-                        result = self._execute_single_operation(conn, connector, op)
-                        result.execution_time = time.time() - start_time
-                        results.append(result)
+                        connector.set_query_timeout(conn, unified_timeout)
+                        self.logger.debug(f"Set query timeout to {unified_timeout}s for database {db_id}")
                     except Exception as e:
+                        self.logger.warning(f"Failed to set query timeout for {db_id}: {e}")
+                
+                for i, op in enumerate(operations):
+                    if self._closed:
                         results.append(BatchResult(
                             operation_id=op.operation_id or f"{op.operation_type.value}_{hash(op.sql)}",
                             success=False,
-                            error=str(e)
+                            error="Executor is closed"
                         ))
+                        continue
+                        
+                    try:
+                        start_time = time.time()
+                        
+                        result = self._execute_single_operation_with_db_timeout(conn, connector, op, unified_timeout)
+                        result.execution_time = time.time() - start_time
+                        results.append(result)
+                        
+                        if result.execution_time > unified_timeout * 0.8:
+                            self.logger.warning(f"Slow operation {op.operation_id} took {result.execution_time:.2f}s (timeout: {unified_timeout}s)")
+                            
+                    except Exception as e:
+                        execution_time = time.time() - start_time
+                        error_msg = str(e)
+                        
+                        if 'timeout' in error_msg.lower() or 'exceeded' in error_msg.lower():
+                            error_msg = f"SQL execution timeout after {unified_timeout}s: {error_msg}"
+                        
+                        self.logger.error(f"Exception in operation {op.operation_id}: {error_msg}")
+                        results.append(BatchResult(
+                            operation_id=op.operation_id or f"{op.operation_type.value}_{hash(op.sql)}",
+                            success=False,
+                            error=error_msg,
+                            execution_time=execution_time
+                        ))
+            
+            success_count = sum(1 for r in results if r.success)
+            timeout_count = sum(1 for r in results if not r.success and 'timeout' in r.error.lower())
+            total_time = time.time() - connection_start
+            
+            self.logger.info(f"Database {db_id} completed: {success_count}/{len(results)} operations succeeded, {timeout_count} timeouts, in {total_time:.2f}s")
             
             return results
             
         except Exception as e:
-            # 连接错误，为所有操作创建错误结果
+            self.logger.error(f"Error in _execute_db_operations for {db_id}: {e}")
             results = []
             for op in operations:
                 results.append(BatchResult(
@@ -789,132 +960,156 @@ class BatchOperationExecutor:
                     error=f"Connection error: {str(e)}"
                 ))
             return results
-    
-    def _execute_single_operation(self, conn, connector, operation: BatchOperation) -> BatchResult:
-        """执行单个操作"""
+
+    def _execute_single_operation_with_db_timeout(self, conn, connector, operation: BatchOperation, timeout_seconds: float) -> BatchResult:
         operation_id = operation.operation_id or f"{operation.operation_type.value}_{hash(operation.sql)}"
                 
         try:
             if operation.operation_type == OperationType.EXECUTE_QUERY:
-                return self._execute_query_operation(conn, connector, operation, operation_id)
+                return self._execute_query_operation_with_timeout(conn, connector, operation, operation_id, timeout_seconds)
             elif operation.operation_type == OperationType.ANALYZE_PLAN:
                 return self._execute_plan_operation(conn, connector, operation, operation_id)
             elif operation.operation_type == OperationType.VALIDATE_SQL:
-                return self._execute_validate_operation(conn, connector, operation, operation_id)
+                return self._execute_validate_operation_with_timeout(conn, connector, operation, operation_id, timeout_seconds)
             elif operation.operation_type == OperationType.COMPARE_SQL:
-                return self._execute_compare_operation(conn, connector, operation, operation_id)
+                return self._execute_compare_operation_with_timeout(conn, connector, operation, operation_id, timeout_seconds)
             else:
                 raise ValueError(f"Unsupported operation type: {operation.operation_type}")
                 
+        except Exception as e:
+            error_msg = str(e)
+            if 'timeout' in error_msg.lower() or 'exceeded' in error_msg.lower():
+                error_msg = f"Operation timeout: {error_msg}"
+            
+            return BatchResult(
+                operation_id=operation_id,
+                success=False,
+                error=error_msg
+            )
+
+    def _execute_query_operation_with_timeout(self, conn, connector, operation: BatchOperation, operation_id: str, timeout_seconds: float) -> BatchResult:
+        try:
+            if hasattr(connector, 'execute_query_with_timeout'):
+                rows = connector.execute_query_with_timeout(conn, operation.sql, timeout_seconds)
+            else:
+                rows = connector.execute_query(conn, operation.sql)
+            
+            columns = []
+            if rows and isinstance(rows[0], dict):
+                columns = list(rows[0].keys())
+            elif rows:
+                columns = [f"col_{i}" for i in range(len(rows[0]))] if rows[0] else []
+            
+            result_data = {
+                'success': True,
+                'data': rows,
+                'columns': columns,
+                'row_count': len(rows) if rows else 0
+            }
+            
+            return BatchResult(
+                operation_id=operation_id,
+                success=True,
+                data=result_data
+            )
+            
+        except TimeoutError as e:
+            return BatchResult(
+                operation_id=operation_id,
+                success=False,
+                error=f"Query execution timeout: {str(e)}"
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if 'timeout' in error_msg.lower() or 'max_execution_time' in error_msg.lower():
+                error_msg = f"Query execution timeout: {error_msg}"
+            
+            return BatchResult(
+                operation_id=operation_id,
+                success=False,
+                error=error_msg
+            )
+
+    def _execute_plan_operation(self, conn, connector, operation: BatchOperation, operation_id: str) -> BatchResult:
+        try:
+            execution_plan = connector.get_execution_plan(conn, operation.sql)
+            return BatchResult(
+                operation_id=operation_id,
+                success=True,
+                data={'execution_plan': execution_plan}
+            )
         except Exception as e:
             return BatchResult(
                 operation_id=operation_id,
                 success=False,
                 error=str(e)
             )
-    
-    def _execute_query_operation(self, conn, connector, operation: BatchOperation, operation_id: str) -> BatchResult:
-        """执行查询操作"""
-        # 检查缓存
-        cached_result = self.cache.get_query_result_smart(operation.db_id, operation.sql)
-        if cached_result:
-            return BatchResult(
-                operation_id=operation_id,
-                success=True,
-                data=cached_result
-            )
-        
-        rows = connector.execute_query(conn, operation.sql)
-        columns = self._get_columns_from_connection(conn)
-        
-        result_data = {
-            'success': True,
-            'data': rows,
-            'columns': columns,
-            'row_count': len(rows) if rows else 0
-        }
-        
-        # 缓存结果
-        self.cache.set_query_result(operation.db_id, operation.sql, result_data)
-        
-        return BatchResult(
-            operation_id=operation_id,
-            success=True,
-            data=result_data
-        )
-    
-    def _execute_plan_operation(self, conn, connector, operation: BatchOperation, operation_id: str) -> BatchResult:
-        """执行执行计划分析操作"""
-        cached_plan = self.cache.get_execution_plan(operation.db_id, operation.sql)
-        if cached_plan:
-            return BatchResult(
-                operation_id=operation_id,
-                success=True,
-                data={'execution_plan': cached_plan}
-            )
-        
-        execution_plan = connector.get_execution_plan(conn, operation.sql)
-        self.cache.set_execution_plan(operation.db_id, operation.sql, execution_plan)
-        
-        return BatchResult(
-            operation_id=operation_id,
-            success=True,
-            data={'execution_plan': execution_plan}
-        )
-    
-    def _execute_validate_operation(self, conn, connector, operation: BatchOperation, operation_id: str) -> BatchResult:
-        """执行SQL验证操作"""
+
+    def _execute_validate_operation_with_timeout(self, conn, connector, operation: BatchOperation, operation_id: str, timeout_seconds: float) -> BatchResult:
         try:
-            connector.execute_query(conn, operation.sql)
+            if hasattr(connector, 'execute_query_with_timeout'):
+                connector.execute_query_with_timeout(conn, operation.sql, timeout_seconds)
+            else:
+                connector.execute_query(conn, operation.sql)
+            
             return BatchResult(
                 operation_id=operation_id,
                 success=True,
                 data={'valid': True}
             )
-        except Exception:
+        except (TimeoutError, Exception) as e:
+            error_msg = str(e)
+            if 'timeout' in error_msg.lower():
+                return BatchResult(
+                    operation_id=operation_id,
+                    success=True,
+                    data={'valid': False, 'error': 'timeout'}
+                )
+            else:
+                return BatchResult(
+                    operation_id=operation_id,
+                    success=True,
+                    data={'valid': False, 'error': error_msg}
+                )
+
+    def _execute_compare_operation_with_timeout(self, conn, connector, operation: BatchOperation, operation_id: str, timeout_seconds: float) -> BatchResult:
+        try:
+            additional_params = operation.additional_params or {}
+            sql2 = additional_params.get('sql2')
+            if not sql2:
+                raise ValueError("sql2 required for compare operation")
+            
+            result1 = self._execute_query_for_comparison_with_timeout(conn, connector, operation.sql, timeout_seconds)
+            result2 = self._execute_query_for_comparison_with_timeout(conn, connector, sql2, timeout_seconds)
+            
+            is_equal = self._compare_query_results(result1, result2)
+            
             return BatchResult(
                 operation_id=operation_id,
                 success=True,
-                data={'valid': False}
+                data={'equal': is_equal, 'result1': result1, 'result2': result2}
             )
-    
-    def _execute_compare_operation(self, conn, connector, operation: BatchOperation, operation_id: str) -> BatchResult:
-        """执行SQL比较操作"""
-        additional_params = operation.additional_params or {}
-        sql2 = additional_params.get('sql2')
-        if not sql2:
-            raise ValueError("sql2 required for compare operation")
-        
-        result1 = self._execute_query_for_comparison(conn, connector, operation.sql)
-        result2 = self._execute_query_for_comparison(conn, connector, sql2)
-        
-        is_equal = self._compare_query_results(result1, result2)
-        
-        return BatchResult(
-            operation_id=operation_id,
-            success=True,
-            data={'equal': is_equal, 'result1': result1, 'result2': result2}
-        )
-    
-    def _get_columns_from_connection(self, conn, cursor=None) -> List[str]:
-        """从连接获取列信息"""
-        columns = []
-        if cursor and hasattr(cursor, 'description') and cursor.description:
-            columns = [desc[0] for desc in cursor.description]
-        elif hasattr(conn, 'cursor'):
-            temp_cursor = conn.cursor()
-            try:
-                if hasattr(temp_cursor, 'description') and temp_cursor.description:
-                    columns = [desc[0] for desc in temp_cursor.description]
-            finally:
-                temp_cursor.close()
-        return columns
-    
-    def _execute_query_for_comparison(self, conn, connector, sql: str) -> Dict:
-        """为比较执行查询"""
+        except Exception as e:
+            error_msg = str(e)
+            if 'timeout' in error_msg.lower():
+                error_msg = f"Comparison operation timeout: {error_msg}"
+            
+            return BatchResult(
+                operation_id=operation_id,
+                success=False,
+                error=error_msg
+            )
+
+    def _execute_query_for_comparison_with_timeout(self, conn, connector, sql: str, timeout_seconds: float) -> Dict:
         try:
-            rows = connector.execute_query(conn, sql)
-            columns = self._get_columns_from_connection(conn)
+            if hasattr(connector, 'execute_query_with_timeout'):
+                rows = connector.execute_query_with_timeout(conn, sql, timeout_seconds)
+            else:
+                rows = connector.execute_query(conn, sql)
+                
+            columns = []
+            if rows and isinstance(rows[0], dict):
+                columns = list(rows[0].keys())
             return {
                 'success': True,
                 'data': rows,
@@ -929,7 +1124,6 @@ class BatchOperationExecutor:
             }
     
     def _compare_query_results(self, result1: Dict, result2: Dict) -> bool:
-        """比较查询结果"""
         if not result1['success'] or not result2['success']:
             return False
         
@@ -940,7 +1134,9 @@ class BatchOperationExecutor:
             return False
         
         def normalize_row(row):
-            if isinstance(row, (list, tuple)):
+            if isinstance(row, dict):
+                return tuple(sorted([(k, str(v) if v is not None else None) for k, v in row.items()]))
+            elif isinstance(row, (list, tuple)):
                 return tuple(str(item) if item is not None else None for item in row)
             return (str(row) if row is not None else None,)
         
@@ -950,52 +1146,52 @@ class BatchOperationExecutor:
         return normalized_data1 == normalized_data2
 
     def close(self):
-        """关闭执行器"""
+        self._closed = True
         if self._own_executor and hasattr(self, 'executor') and self.executor:
-            self.executor.shutdown(wait=True)
+            try:
+                self.executor.shutdown(wait=True, timeout=10)
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.warning(f"Error shutting down batch executor: {e}")
 
 class DatabaseManager:
     
     def __init__(self, db_type: str = "sqlite", config: Optional[Dict] = None, 
-                 logger=None, max_connections_per_db=5, max_workers=16):
+                 logger=None, max_connections_per_db=3, max_workers=8):
         self.db_type = db_type.lower()
         self.config = config or {}
-        self.logger = logger if logger else get_logger()
+        self.logger = logger if logger else self._get_default_logger()
         self.max_connections_per_db = max_connections_per_db
         self.max_workers = max_workers
         
-        # 核心组件
         self.registry = DatabaseRegistry(self.logger)
-        self.cache = CacheManager()
+        self.cache = CacheManager(max_size=100, ttl=1800)
         
-        # 连接池管理
         self.connection_pools: Dict[str, ConnectionPool] = {}
-        self.pool_lock = threading.Lock()
+        self.pool_lock = threading.RLock()
         
-        # 统一的线程池用于并发执行
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        self.executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="DatabaseManager"
+        )
         
         self.connectors = {
             'sqlite': SQLiteConnector(),
             'mysql': MySQLConnector()
         }
         
-        # 批量执行器 - 使用依赖注入，避免循环依赖
         self.batch_executor = BatchOperationExecutor(
             registry=self.registry,
             cache=self.cache,
             connectors=self.connectors,
-            connection_pool_getter=self._get_connection_pool,  # 传递函数而不是self
+            connection_pool_getter=self._get_connection_pool,
             logger=self.logger,
             shared_executor=self.executor
         )
         
-        # 定期清理空闲连接
         self._cleanup_timer = None
-        self._cleanup_lock = threading.Lock()
+        self._cleanup_lock = threading.RLock()
         self._shutdown_requested = False
-        
-        # 初始化标志
         self._initialized = False
         
         try:
@@ -1004,17 +1200,22 @@ class DatabaseManager:
             self._start_cleanup_timer()
             self._initialized = True
             
-            if self.config.get('enable_cache_prewarming', False):
-                self._prewarm_cache()
-                
         except Exception as e:
             self.logger.error(f"Failed to initialize DatabaseManager: {e}")
             self.close()
             raise
-    
+
+    def _get_default_logger(self):
+        logger = logging.getLogger(__name__)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+        return logger
 
     def _start_cleanup_timer(self):
-        """启动清理定时器"""
         with self._cleanup_lock:
             if self._cleanup_timer is None and not self._shutdown_requested:
                 self._cleanup_timer = threading.Timer(300, self._periodic_cleanup)
@@ -1022,36 +1223,35 @@ class DatabaseManager:
                 self._cleanup_timer.start()
                 self.logger.debug("Cleanup timer started")
 
-    def _prewarm_cache(self):
-        """预热缓存 - 加载常用的schema信息"""
-        def prewarm_task():
-            try:
-                databases = self.list_databases()[:10]  # 只预热前5个数据库
-                for db_id in databases:
-                    try:
-                        self.get_database_schema(db_id, use_cache=True)
-                        self.logger.debug(f"Prewarmed cache for database: {db_id}")
-                    except Exception as e:
-                        self.logger.warning(f"Failed to prewarm cache for {db_id}: {e}")
-            except Exception as e:
-                self.logger.warning(f"Cache prewarming failed: {e}")
+    def _periodic_cleanup(self):
+        if self._shutdown_requested:
+            return
         
-        # 异步预热，不阻塞初始化
-        self.executor.submit(prewarm_task)
+        try:
+            total_cleaned = 0
+            with self.pool_lock:
+                for db_id, pool in self.connection_pools.items():
+                    cleaned = pool.cleanup_idle_connections()
+                    total_cleaned += cleaned
+            
+            if total_cleaned > 0:
+                self.logger.info(f"Cleaned up {total_cleaned} idle connections")
+            
+            with self._cleanup_lock:
+                if not self._shutdown_requested:
+                    self._cleanup_timer = threading.Timer(300, self._periodic_cleanup)
+                    self._cleanup_timer.daemon = True
+                    self._cleanup_timer.start()
+                    
+        except Exception as e:
+            self.logger.error(f"Error in periodic cleanup: {e}")
 
-    def _create_error_response(self, error_msg: str = '') -> Dict[str, Any]:
-        return {
-            'success': False,
-            'error': error_msg or 'Unknown error',
-            'data': [],
-            'columns': [],
-            'row_count': 0
-        }
-    
     def _get_connection_pool(self, db_id: str) -> ConnectionPool:
-        """获取或创建数据库连接池"""
         if not self._initialized:
             raise RuntimeError("DatabaseManager not properly initialized")
+        
+        if self._shutdown_requested:
+            raise RuntimeError("DatabaseManager is shutting down")
             
         if db_id not in self.connection_pools:
             with self.pool_lock:
@@ -1072,11 +1272,8 @@ class DatabaseManager:
                     self.logger.debug(f"Created connection pool for database: {db_id}")
         
         return self.connection_pools[db_id]
-    
-    # ==================== 批量操作接口 ====================
-    
+
     def batch_execute_queries(self, queries: List[Dict[str, Any]]) -> List[BatchResult]:
-        """批量执行查询"""
         if not self._initialized:
             raise RuntimeError("DatabaseManager not properly initialized")
         
@@ -1095,7 +1292,7 @@ class DatabaseManager:
                 operation_type=OperationType.EXECUTE_QUERY,
                 db_id=query['db_id'],
                 sql=query['sql'],
-                timeout=query.get('timeout', 2.0),
+                timeout=query.get('timeout', 30.0),
                 operation_id=query.get('operation_id', f"query_{i}")
             )
             operations.append(op)
@@ -1103,7 +1300,6 @@ class DatabaseManager:
         return self.batch_executor.execute_batch_operations(operations)
     
     def batch_analyze_execution_plans(self, queries: List[Dict[str, Any]]) -> List[BatchResult]:
-        """批量分析执行计划"""
         if not self._initialized:
             raise RuntimeError("DatabaseManager not properly initialized")
         
@@ -1122,7 +1318,7 @@ class DatabaseManager:
                 operation_type=OperationType.ANALYZE_PLAN,
                 db_id=query['db_id'],
                 sql=query['sql'],
-                timeout=query.get('timeout', 2.0),
+                timeout=query.get('timeout', 30.0),
                 operation_id=query.get('operation_id', f"plan_{i}")
             )
             operations.append(op)
@@ -1130,7 +1326,6 @@ class DatabaseManager:
         return self.batch_executor.execute_batch_operations(operations)
     
     def batch_validate_sql(self, queries: List[Dict[str, Any]]) -> List[BatchResult]:
-        """批量验证SQL"""
         if not self._initialized:
             raise RuntimeError("DatabaseManager not properly initialized")
         
@@ -1149,7 +1344,7 @@ class DatabaseManager:
                 operation_type=OperationType.VALIDATE_SQL,
                 db_id=query['db_id'],
                 sql=query['sql'],
-                timeout=query.get('timeout', 2.0),
+                timeout=query.get('timeout', 30.0),
                 operation_id=query.get('operation_id', f"validate_{i}")
             )
             operations.append(op)
@@ -1157,7 +1352,6 @@ class DatabaseManager:
         return self.batch_executor.execute_batch_operations(operations)
     
     def batch_compare_sql(self, comparisons: List[Dict[str, Any]]) -> List[BatchResult]:
-        """批量比较SQL"""
         if not self._initialized:
             raise RuntimeError("DatabaseManager not properly initialized")
         
@@ -1177,7 +1371,7 @@ class DatabaseManager:
                 operation_type=OperationType.COMPARE_SQL,
                 db_id=comp['db_id'],
                 sql=comp['sql1'],
-                timeout=comp.get('timeout', 2.0),
+                timeout=comp.get('timeout', 30.0),
                 additional_params={'sql2': comp['sql2']},
                 operation_id=comp.get('operation_id', f"compare_{i}")
             )
@@ -1185,157 +1379,181 @@ class DatabaseManager:
         
         return self.batch_executor.execute_batch_operations(operations)
     
-    # ==================== 单个操作接口（统一实现）====================
+    # ==================== Single Operation Interface (Retained for Compatibility) ====================
     
-    def _execute_single_operation_template(self, 
-                                         operation_type: OperationType,
-                                         db_id: str, 
-                                         sql: str, 
-                                         timeout: float = 2.0,
-                                         additional_params: Optional[Dict] = None) -> Dict[str, Any]:
-        """通用单操作执行模板"""
+    def execute_query(self, db_id: str, sql: str, use_cache: bool = False) -> Dict[str, Any]:
         if not self._initialized:
-            return self._create_error_response("DatabaseManager not properly initialized")
-        
-        if not db_id or not sql:
-            return self._create_error_response("db_id and sql are required")
-        
-        operation = BatchOperation(
-            operation_type=operation_type,
-            db_id=db_id,
-            sql=sql,
-            timeout=timeout,
-            additional_params=additional_params
-        )
-        
-        try:
-            results = self.batch_executor.execute_batch_operations([operation])
-            
-            if results and results[0].success:
-                return results[0].data
-            else:
-                error_msg = results[0].error if results and results[0].error else 'Unknown error'
-                return self._create_error_response(error_msg)
-        except Exception as e:
-            self.logger.error(f"Error executing {operation_type.value} for {db_id}: {e}")
-            return self._create_error_response(str(e))
-    def execute_query(self, db_id: str, sql: str, timeout: float = 2.0) -> Dict[str, Any]:
-        """执行单个查询"""
-        return self._execute_single_operation_template(OperationType.EXECUTE_QUERY, db_id, sql, timeout)
-    
-    def analyze_sql_execution_plan(self, db_id: str, sql: str, timeout: float = 2.0) -> Dict[str, Any]:
-        """分析SQL执行计划"""
-        result = self._execute_single_operation_template(OperationType.ANALYZE_PLAN, db_id, sql, timeout)
-        if result.get('success'):
-            return {'success': True, **result}
-        return {'success': False, 'error': result.get('error', 'Unknown error')}
-    
-    def validate_sql(self, db_id: str, sql: str, timeout: float = 2.0) -> bool:
-        """验证SQL语法"""
-        result = self._execute_single_operation_template(OperationType.VALIDATE_SQL, db_id, sql, timeout)
-        return result.get('valid', False) if result.get('success') else False
-    
-    def compare_sql(self, db_id: str, sql1: str, sql2: str, timeout: float = 2.0) -> bool:
-        """比较两个SQL的结果"""
-        result = self._execute_single_operation_template(
-            OperationType.COMPARE_SQL, db_id, sql1, timeout, {'sql2': sql2}
-        )
-        return result.get('equal', False) if result.get('success') else False
-    
-    # ==================== Schema相关方法 ====================
-    
-    def get_database_schema(self, db_id: str, use_cache: bool = True) -> Dict:
-        """获取数据库schema（增强缓存）"""
-        if not self._initialized:
-            self.logger.error("DatabaseManager not properly initialized")
-            return {}
-        
-        if not db_id:
-            self.logger.error("db_id is required")
-            return {}
-        
-        if use_cache:
-            cached_schema = self.cache.get_schema(db_id, self.db_type)
-            if cached_schema:
-                return cached_schema
-        
-        db_info = self.registry.get_database(db_id)
-        if not db_info:
-            self.logger.error(f"Database {db_id} not found")
-            return {}
-        
-        connector = self.connectors.get(db_info.db_type)
-        if not connector:
-            self.logger.error(f"No connector found for database type: {db_info.db_type}")
-            return {}
-        
-        schema = {'tables': {}, 'foreign_keys': [], 'primary_keys': []}
+            raise RuntimeError("DatabaseManager not properly initialized")
         
         try:
             pool = self._get_connection_pool(db_id)
+            db_info = self.registry.get_database(db_id)
+            connector = self.connectors.get(db_info.db_type)
+            
+            with pool.get_connection() as conn:
+                rows = connector.execute_query(conn, sql)
+                
+                columns = []
+                if rows and isinstance(rows[0], dict):
+                    columns = list(rows[0].keys())
+                elif rows:
+                    columns = [f"col_{i}" for i in range(len(rows[0]))] if rows[0] else []
+                
+                return {
+                    'success': True,
+                    'data': rows,
+                    'columns': columns,
+                    'row_count': len(rows) if rows else 0
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Query execution failed for {db_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': [],
+                'columns': [],
+                'row_count': 0
+            }
+    
+    # ==================== Schema Related Methods ====================
+    
+    def get_database_schema(self, db_id: str, use_cache: bool = True) -> Dict[str, Any]:
+        if not self._initialized:
+            raise RuntimeError("DatabaseManager not properly initialized")
+        
+        try:
+            db_info = self.registry.get_database(db_id)
+            if not db_info:
+                raise ValueError(f"Database {db_id} not found")
+            
+            if use_cache:
+                cached_schema = self.cache.get_schema(db_id, db_info.db_type)
+                if cached_schema:
+                    self.logger.debug(f"Using cached schema for database: {db_id}")
+                    return cached_schema
+            
+            pool = self._get_connection_pool(db_id)
+            connector = self.connectors.get(db_info.db_type)
+            
+            schema = {'tables': {}, 'foreign_keys': [], 'primary_keys': []}
+            
             with pool.get_connection() as conn:
                 tables = connector.get_tables(conn)
+                self.logger.debug(f"Found {len(tables)} tables in {db_id}: {tables}")
+                
+                if not tables:
+                    self.logger.warning(f"No tables found in database {db_id}")
+                    return schema
                 
                 for table_name in tables:
-                    # 检查表信息缓存
-                    cached_table_info = self.cache.get_table_info(db_id, table_name)
-                    if cached_table_info and use_cache:
-                        table_schema = cached_table_info
-                    else:
-                        table_schema = connector.get_table_schema(conn, table_name)
-                        sample_data = connector.get_sample_data(conn, table_name, 2)
-                        
-                        # 添加示例数据
-                        for i, col_name in enumerate(table_schema.get('columns', {}).keys()):
-                            examples = []
-                            for row in sample_data.get('rows', []):
-                                if i < len(row) and row[i] is not None:
-                                    examples.append(str(row[i]))
-                            table_schema['columns'][col_name]['examples'] = examples
-                        
-                        # 缓存表信息
+                    try:
                         if use_cache:
-                            self.cache.set_table_info(db_id, table_name, table_schema)
-                    
-                    schema['tables'][table_name] = table_schema
-                    
-                    # 处理主键和外键
-                    for pk in table_schema.get('primary_keys', []):
-                        schema['primary_keys'].append({
-                            'table': table_name,
-                            'column': pk
-                        })
+                            cached_table_info = self.cache.get_table_info(db_id, table_name)
+                            if cached_table_info:
+                                table_schema = cached_table_info
+                            else:
+                                table_schema = self._get_fresh_table_schema(conn, connector, table_name)
+                                self.cache.set_table_info(db_id, table_name, table_schema)
+                        else:
+                            table_schema = self._get_fresh_table_schema(conn, connector, table_name)
+                        
+                        schema['tables'][table_name] = table_schema
+                        
+                        for pk in table_schema.get('primary_keys', []):
+                            schema['primary_keys'].append({
+                                'table': table_name,
+                                'column': pk
+                            })
 
-                    for fk in table_schema.get('foreign_keys', []):
-                        schema['foreign_keys'].append({
-                            'source_table': table_name,
-                            'source_column': fk['column'],
-                            'referenced_table': fk['referenced_table'],
-                            'referenced_column': fk['referenced_column']
-                        })
+                        for fk in table_schema.get('foreign_keys', []):
+                            schema['foreign_keys'].append({
+                                'source_table': table_name,
+                                'source_column': fk['column'],
+                                'referenced_table': fk['referenced_table'],
+                                'referenced_column': fk['referenced_column']
+                            })
+                            
+                    except Exception as table_error:
+                        self.logger.error(f"Error processing table {table_name}: {table_error}")
+                        continue
             
-            # 缓存schema
-            if use_cache:
-                self.cache.set_schema(db_id, self.db_type, schema)
+            if use_cache and schema['tables']:
+                self.cache.set_schema(db_id, db_info.db_type, schema)
+                self.logger.debug(f"Cached schema for database: {db_id}")
             
+            return schema
+                
         except Exception as e:
-            self.logger.error(f"Error getting schema for {db_id}: {e}")
-            return {}
+            self.logger.error(f"Failed to get schema for {db_id}: {e}")
+            return {
+                'tables': {},
+                'foreign_keys': [],
+                'primary_keys': []
+            }
+    
+    def _get_fresh_table_schema(self, conn, connector, table_name: str) -> Dict:
+        table_schema = connector.get_table_schema(conn, table_name)
         
-        return schema
-
-    def get_table_names_and_create_statements(self, db_id: str) -> tuple:
-        """获取表名和创建语句"""
+        sample_data = connector.get_sample_data(conn, table_name, 2)
+        
+        for col_name in table_schema.get('columns', {}).keys():
+            examples = []
+            for row in sample_data.get('rows', []):
+                if isinstance(row, dict) and col_name in row and row[col_name] is not None:
+                    examples.append(str(row[col_name]))
+                elif isinstance(row, (list, tuple)):
+                    col_names = sample_data.get('columns', [])
+                    if col_name in col_names:
+                        col_index = col_names.index(col_name)
+                        if col_index < len(row) and row[col_index] is not None:
+                            examples.append(str(row[col_index]))
+            
+            table_schema['columns'][col_name]['examples'] = examples[:3]
+        
+        return table_schema
+    
+    def get_table_names_and_create_statements(self, db_id: str) -> Tuple[List[str], List[str]]:
         schema = self.get_database_schema(db_id, use_cache=True)
-        if not schema:
+        if not schema or not schema.get('tables'):
             return [], []
         
-        table_names = list(schema.get('tables', {}).keys())
+        table_names = list(schema['tables'].keys())
         create_statements = self._generate_create_statements(schema)
         return table_names, create_statements
+    
+    def _generate_create_statements(self, schema: Dict) -> List[str]:
+        create_statements = []
+        
+        for table_name, table_info in schema.get('tables', {}).items():
+            columns_def = []
+            
+            for col_name, col_info in table_info.get('columns', {}).items():
+                col_type = col_info.get('type', 'TEXT')
+                nullable = col_info.get('nullable', True)
+                
+                col_def = f'"{col_name}" {col_type}'
+                if not nullable:
+                    col_def += ' NOT NULL'
+                
+                columns_def.append(col_def)
+            
+            primary_keys = table_info.get('primary_keys', [])
+            if primary_keys:
+                pk_cols = ', '.join([f'"{pk}"' for pk in primary_keys])
+                columns_def.append(f'PRIMARY KEY ({pk_cols})')
+            
+            for fk in table_info.get('foreign_keys', []):
+                fk_def = f'FOREIGN KEY ("{fk["column"]}") REFERENCES "{fk["referenced_table"]}"("{fk["referenced_column"]}")'
+                columns_def.append(fk_def)
+            
+            if columns_def:
+                create_statement = f'CREATE TABLE "{table_name}" (\n    ' + ',\n    '.join(columns_def) + '\n);'
+                create_statements.append(create_statement)
+        
+        return create_statements
 
     def get_insert_statements(self, db_id: str, table_names: Optional[List[str]] = None, limit: int = 2) -> Dict[str, List[str]]:
-        """获取插入语句"""
         if not self._initialized:
             return {}
         
@@ -1345,11 +1563,9 @@ class DatabaseManager:
         if limit <= 0:
             limit = 2
         
-        # 统一的缓存键生成
         table_names_key = tuple(sorted(table_names or []))
         cache_key = f"insert_statements_{db_id}_{limit}_{hash(table_names_key)}"
         
-        # 检查缓存
         cached_result = self.cache.get_query_result(db_id, cache_key)
         if cached_result:
             return cached_result.get('data', {})
@@ -1376,7 +1592,6 @@ class DatabaseManager:
             with pool.get_connection() as conn:
                 for table_name in table_names:
                     try:
-                        # 表级别的缓存
                         table_cache_key = f"insert_{db_id}_{table_name}_{limit}"
                         cached_insert = self.cache.get_query_result(db_id, table_cache_key)
                         
@@ -1389,13 +1604,11 @@ class DatabaseManager:
                             )
                             result[table_name] = insert_statements
                             
-                            # 缓存insert语句
                             self.cache.set_query_result(db_id, table_cache_key, {'data': insert_statements})
                     except Exception as e:
                         self.logger.warning(f"Error getting insert statements for table {table_name}: {e}")
                         result[table_name] = []
             
-            # 缓存整体结果
             self.cache.set_query_result(db_id, cache_key, {'data': result})
             
         except Exception as e:
@@ -1404,7 +1617,6 @@ class DatabaseManager:
         return result
     
     def _generate_insert_statements(self, table_name: str, sample_data: Dict, db_type: str) -> List[str]:
-        """生成插入语句"""
         if not sample_data.get('rows'):
             return []
         
@@ -1414,7 +1626,6 @@ class DatabaseManager:
         if not columns:
             return []
         
-        # 根据数据库类型选择引用符
         if db_type == 'mysql':
             table_quote = '`'
             col_quote = '`'
@@ -1447,30 +1658,25 @@ class DatabaseManager:
         
         return statements
 
-    # ==================== DDL 生成方法 ====================
+    # ==================== DDL Generation Methods ====================
     
     def generate_ddl_with_examples(self, db_id: str) -> str:
-        """生成带示例的DDL"""
         schema = self.get_database_schema(db_id, use_cache=True)
         return self._generate_ddl(schema, use_examples=True)
     
     def generate_ddl_without_examples(self, db_id: str) -> str:
-        """生成不带示例的DDL"""
         schema = self.get_database_schema(db_id, use_cache=True)
         return self._generate_ddl(schema, use_examples=False)
     
     def generate_formatted_schema_with_examples(self, db_id: str) -> str:
-        """生成带示例的格式化schema"""
         schema = self.get_database_schema(db_id, use_cache=True)
         return self._generate_formatted_schema(schema, use_examples=True)
     
     def generate_formatted_schema_without_examples(self, db_id: str) -> str:
-        """生成不带示例的格式化schema"""
         schema = self.get_database_schema(db_id, use_cache=True)    
         return self._generate_formatted_schema(schema, use_examples=False)
     
     def _generate_create_statements(self, schema: Dict) -> List[str]:
-        """生成创建表语句"""
         statements = []
         
         for table_name, table_info in schema.get('tables', {}).items():
@@ -1495,7 +1701,6 @@ class DatabaseManager:
         return statements
     
     def _generate_ddl(self, schema: Dict, use_examples: bool = False) -> str:
-        """生成DDL语句"""
         if not schema or not schema.get('tables'):
             return ""
         
@@ -1539,13 +1744,11 @@ class DatabaseManager:
                 )
                 ddl_statements.append(create_table_sql)
         
-        # 处理全局外键
         global_fks = []
         for fk in schema.get('foreign_keys', []):
             source_table = schema['tables'].get(fk['source_table'], {})
             table_fks = source_table.get('foreign_keys', [])
             
-            # 检查是否已经在表定义中包含了这个外键
             if not any(tfk.get('column') == fk['source_column'] and 
                       tfk.get('referenced_table') == fk['referenced_table'] and
                       tfk.get('referenced_column') == fk['referenced_column'] 
@@ -1561,7 +1764,6 @@ class DatabaseManager:
         return '\n\n'.join(ddl_statements)
     
     def _generate_formatted_schema(self, schema: Dict, use_examples: bool = False) -> str:
-        """生成格式化的schema描述"""
         if not schema or not schema.get('tables'):
             return "No tables found in the database."
         
@@ -1606,7 +1808,6 @@ class DatabaseManager:
                 
                 formatted_parts.append(col_desc)
             
-            # 处理外键关系
             table_fks = [fk for fk in schema.get('foreign_keys', []) 
                         if fk['source_table'] == table_name]
             if table_fks:
@@ -1637,10 +1838,9 @@ class DatabaseManager:
         return '\n'.join(formatted_parts)
     
 
-    # ==================== 数据库发现和管理方法 ====================
+    # ==================== Database Discovery and Management Methods ====================
     
     def _validate_config(self):
-        """验证配置"""
         if self.db_type not in self.connectors:
             raise ValueError(f"Unsupported database type: {self.db_type}")
         
@@ -1661,7 +1861,6 @@ class DatabaseManager:
             if missing:
                 raise ValueError(f"Missing required {self.db_type} config: {missing}")
             
-            # 验证端口号
             if 'port' in self.config:
                 try:
                     port = int(self.config['port'])
@@ -1671,7 +1870,6 @@ class DatabaseManager:
                     raise ValueError(f"Port must be a valid integer: {self.config['port']}")
     
     def _discover_databases(self):
-        """发现数据库"""
         self.logger.info(f"Discovering {self.db_type} databases")
         try:
             if self.db_type == 'sqlite':
@@ -1685,38 +1883,31 @@ class DatabaseManager:
             raise
     
     def _discover_sqlite_databases(self):
-        """发现SQLite数据库"""
         root_path = self.config['root_path']
         extensions = ['*.sqlite', '*.sqlite3', '*.db']
         discovered_count = 0
         
         try:
-            # 首先收集所有符合条件的文件
             all_files = []
             for ext in extensions:
                 pattern = os.path.join(root_path, '**', ext)
                 files = glob.glob(pattern, recursive=True)
                 all_files.extend(files)
             
-            # 去重（可能有文件被多个模式匹配到）
             all_files = list(set(all_files))
             
-            # 统一遍历所有发现的文件
             for db_file in tqdm(all_files, desc="Discovering SQLite databases"):
                 if os.path.isfile(db_file):
                     try:
-                        # 生成唯一的数据库ID，包含相对路径以避免冲突
                         relative_path = os.path.relpath(db_file, root_path)
                         db_id = os.path.splitext(relative_path.replace(os.sep, '_'))[0]
                             
-                        # 确保ID唯一性
                         original_db_id = db_id
                         counter = 1
                         while self.registry.database_exists(db_id):
                             db_id = f"{original_db_id}_{counter}"
                             counter += 1
                             
-                        # 验证文件是否为有效的SQLite数据库
                         if self._validate_sqlite_file(db_file):
                             db_info = DatabaseInfo(
                                 db_id=db_id,
@@ -1744,13 +1935,10 @@ class DatabaseManager:
             raise
     
     def _validate_sqlite_file(self, file_path: str) -> bool:
-        """验证文件是否为有效的SQLite数据库"""
         try:
-            # 检查文件大小（SQLite文件至少100字节）
             if os.path.getsize(file_path) < 100:
                 return False
             
-            # 检查SQLite文件头
             with open(file_path, 'rb') as f:
                 header = f.read(16)
                 return header.startswith(b'SQLite format 3\x00')
@@ -1758,32 +1946,26 @@ class DatabaseManager:
             return False
     
     def _discover_mysql_databases(self):
-        """发现MySQL数据库"""
         connector = self.connectors['mysql']
         discovered_count = 0
         
         try:
-            # 创建临时配置，排除database参数
             temp_config = {k: v for k, v in self.config.items() if k != 'database'}
             
-            # 测试连接
             self.logger.debug("Testing MySQL connection...")
             conn = connector.connect(temp_config)
             
             try:
-                # 验证连接是否正常工作
                 test_result = connector.execute_query(conn, "SELECT 1 as test")
                 if not test_result or test_result[0][0] != 1:
                     raise Exception("MySQL connection test failed")
                 
-                # 获取数据库列表
                 databases = connector.execute_query(conn, "SHOW DATABASES")
                 system_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
                 
                 for (db_name,) in databases:
                     if db_name not in system_dbs:
                         try:
-                            # 测试是否能连接到特定数据库
                             if self._test_mysql_database_access(connector, temp_config, db_name):
                                 db_info = DatabaseInfo(
                                     db_id=db_name,
@@ -1816,59 +1998,73 @@ class DatabaseManager:
             raise
     
     def _test_mysql_database_access(self, connector, base_config: dict, db_name: str) -> bool:
-        """测试是否能访问特定的MySQL数据库"""
         try:
             test_config = {**base_config, 'database': db_name}
             test_conn = connector.connect(test_config)
             try:
-                # 执行简单查询测试访问权限
                 connector.execute_query(test_conn, "SELECT 1")
                 return True
             finally:
                 test_conn.close()
         except Exception:
             return False
-
-    def _periodic_cleanup(self):
-        """定期清理空闲连接"""
-        if self._shutdown_requested:
-            return
+    
+    # ==================== Single Operation Interface (Uniform Implementation) ====================
+    
+    def _execute_single_operation_template(self, 
+                                         operation_type: OperationType,
+                                         db_id: str, 
+                                         sql: str, 
+                                         timeout: float = 2.0,
+                                         additional_params: Optional[Dict] = None) -> Dict[str, Any]:
+        if not self._initialized:
+            return self._create_error_response("DatabaseManager not properly initialized")
+        
+        if not db_id or not sql:
+            return self._create_error_response("db_id and sql are required")
+        
+        operation = BatchOperation(
+            operation_type=operation_type,
+            db_id=db_id,
+            sql=sql,
+            timeout=timeout,
+            additional_params=additional_params
+        )
         
         try:
-            self.logger.debug("Starting periodic cleanup...")
+            results = self.batch_executor.execute_batch_operations([operation])
             
-            with self.pool_lock:
-                cleanup_count = 0
-                for db_id, pool in self.connection_pools.items():
-                    try:
-                        initial_size = pool.get_stats().get('pool_size', 0)
-                        pool.cleanup_idle_connections()
-                        final_size = pool.get_stats().get('pool_size', 0)
-                        
-                        if initial_size > final_size:
-                            cleanup_count += (initial_size - final_size)
-                            self.logger.debug(f"Cleaned up {initial_size - final_size} connections for {db_id}")
-                            
-                    except Exception as e:
-                        self.logger.warning(f"Error cleaning up connection pool for {db_id}: {e}")
-                
-                if cleanup_count > 0:
-                    self.logger.info(f"Periodic cleanup completed: {cleanup_count} connections cleaned")
-                    
+            if results and results[0].success:
+                return results[0].data
+            else:
+                error_msg = results[0].error if results and results[0].error else 'Unknown error'
+                return self._create_error_response(error_msg)
         except Exception as e:
-            self.logger.error(f"Error during periodic cleanup: {e}")
-        finally:
-            # 重新设置定时器，但要检查是否已经关闭
-            with self._cleanup_lock:
-                if not self._shutdown_requested and self._cleanup_timer is not None:
-                    self._cleanup_timer = threading.Timer(300, self._periodic_cleanup)
-                    self._cleanup_timer.daemon = True
-                    self._cleanup_timer.start()
+            self.logger.error(f"Error executing {operation_type.value} for {db_id}: {e}")
+            return self._create_error_response(str(e))
+
+    def execute_query(self, db_id: str, sql: str, timeout: float = 2.0) -> Dict[str, Any]:
+        return self._execute_single_operation_template(OperationType.EXECUTE_QUERY, db_id, sql, timeout)
     
-    # ==================== 公共接口方法 ====================
+    def analyze_sql_execution_plan(self, db_id: str, sql: str, timeout: float = 2.0) -> Dict[str, Any]:
+        result = self._execute_single_operation_template(OperationType.ANALYZE_PLAN, db_id, sql, timeout)
+        if result.get('success'):
+            return {'success': True, **result}
+        return {'success': False, 'error': result.get('error', 'Unknown error')}
+    
+    def validate_sql(self, db_id: str, sql: str, timeout: float = 2.0) -> bool:
+        result = self._execute_single_operation_template(OperationType.VALIDATE_SQL, db_id, sql, timeout)
+        return result.get('valid', False) if result.get('success') else False
+    
+    def compare_sql(self, db_id: str, sql1: str, sql2: str, timeout: float = 2.0) -> bool:
+        result = self._execute_single_operation_template(
+            OperationType.COMPARE_SQL, db_id, sql1, timeout, {'sql2': sql2}
+        )
+        return result.get('equal', False) if result.get('success') else False
+    
+    # ==================== Public Interface Methods ====================
     
     def list_databases(self) -> List[str]:
-        """列出所有数据库"""
         if not self._initialized:
             self.logger.warning("DatabaseManager not initialized")
             return []
@@ -1879,7 +2075,6 @@ class DatabaseManager:
             return []
     
     def database_exists(self, db_id: str) -> bool:
-        """检查数据库是否存在"""
         if not self._initialized:
             return False
         if not db_id:
@@ -1891,7 +2086,6 @@ class DatabaseManager:
             return False
     
     def get_database_info(self, db_id: str) -> Optional[Dict[str, Any]]:
-        """获取数据库详细信息"""
         if not self._initialized:
             return None
         
@@ -1905,25 +2099,22 @@ class DatabaseManager:
                 'db_type': db_info.db_type,
                 'metadata': db_info.metadata,
                 'connection_info': {k: v for k, v in db_info.connection_info.items() 
-                                  if k not in ['password', 'passwd']}  # 隐藏敏感信息
+                                  if k not in ['password', 'passwd']}
             }
         except Exception as e:
             self.logger.error(f"Error getting database info for {db_id}: {e}")
             return None
     
     def refresh_database_registry(self):
-        """刷新数据库注册表"""
         if not self._initialized:
             raise RuntimeError("DatabaseManager not properly initialized")
         
         try:
             self.logger.info("Refreshing database registry...")
             
-            # 清空现有注册表和缓存
             self.registry.clear()
             self.cache.clear_all()
             
-            # 清空连接池（因为数据库列表可能变化）
             with self.pool_lock:
                 for db_id, pool in self.connection_pools.items():
                     try:
@@ -1932,7 +2123,6 @@ class DatabaseManager:
                         self.logger.warning(f"Error closing pool for {db_id}: {e}")
                 self.connection_pools.clear()
             
-            # 重新发现数据库
             self._discover_databases()
             
             self.logger.info("Database registry refreshed successfully")
@@ -1942,7 +2132,6 @@ class DatabaseManager:
             raise
     
     def clear_cache(self):
-        """清空缓存"""
         try:
             self.cache.clear_all()
             self.logger.info("Cache cleared successfully")
@@ -1951,7 +2140,6 @@ class DatabaseManager:
             raise
 
     def close(self):
-        """关闭所有连接和资源"""
         if self._shutdown_requested:
             self.logger.debug("DatabaseManager already shutting down")
             return
@@ -1960,7 +2148,6 @@ class DatabaseManager:
         self.logger.info("Shutting down DatabaseManager...")
         
         try:
-            # 1. 停止清理定时器
             with self._cleanup_lock:
                 if self._cleanup_timer is not None:
                     try:
@@ -1971,7 +2158,6 @@ class DatabaseManager:
                     finally:
                         self._cleanup_timer = None
             
-            # 2. 关闭批量执行器（如果有独立的线程池）
             if hasattr(self.batch_executor, 'close'):
                 try:
                     self.batch_executor.close()
@@ -1979,7 +2165,6 @@ class DatabaseManager:
                 except Exception as e:
                     self.logger.warning(f"Error closing batch executor: {e}")
             
-            # 3. 关闭所有连接池
             with self.pool_lock:
                 for db_id, pool in self.connection_pools.items():
                     try:
@@ -1989,18 +2174,14 @@ class DatabaseManager:
                         self.logger.warning(f"Error closing connection pool for {db_id}: {e}")
                 self.connection_pools.clear()
             
-            # 4. 关闭线程池 - 修正语法错误
             if hasattr(self, 'executor') and self.executor:
                 try:
-                    # 先尝试优雅关闭
                     self.executor.shutdown(wait=False)
                     
-                    # 等待最多10秒
                     start_time = time.time()
                     while not self.executor._shutdown and time.time() - start_time < 10:
                         time.sleep(0.1)
                     
-                    # 如果还没关闭，强制关闭
                     if not self.executor._shutdown:
                         self.logger.warning("Thread pool did not shut down gracefully, forcing shutdown")
                         self.executor.shutdown(wait=True)
@@ -2010,21 +2191,18 @@ class DatabaseManager:
                 except Exception as e:
                     self.logger.warning(f"Error shutting down thread pool: {e}")
             
-            # 5. 清空缓存
             try:
                 self.cache.clear_all()
                 self.logger.debug("Cache cleared")
             except Exception as e:
                 self.logger.warning(f"Error clearing cache: {e}")
             
-            # 6. 清空注册表
             try:
                 self.registry.clear()
                 self.logger.debug("Registry cleared")
             except Exception as e:
                 self.logger.warning(f"Error clearing registry: {e}")
             
-            # 7. 更新状态
             self._initialized = False
             self.logger.info("DatabaseManager shutdown completed successfully")
             
@@ -2033,15 +2211,12 @@ class DatabaseManager:
             raise
     
     def get_stats(self) -> Dict[str, Any]:
-        """获取系统统计信息"""
         if not self._initialized:
             return {'error': 'DatabaseManager not initialized', 'initialized': False}
         
         try:
-            # 获取缓存统计
             cache_stats = self.cache.get_cache_stats()
             
-            # 连接池统计
             pool_stats = {}
             total_connections = 0
             with self.pool_lock:
@@ -2053,13 +2228,11 @@ class DatabaseManager:
                     except Exception as e:
                         pool_stats[db_id] = {'error': str(e)}
             
-            # 线程池统计
             thread_pool_stats = {
                 'max_workers': self.max_workers,
                 'active_threads': getattr(self.executor, '_threads', 0) if hasattr(self.executor, '_threads') else 'unknown'
             }
             
-            # 数据库统计
             database_count = len(self.list_databases())
             
             return {
@@ -2081,7 +2254,6 @@ class DatabaseManager:
             return {'error': str(e), 'initialized': self._initialized}
     
     def health_check(self) -> Dict[str, Any]:
-        """系统健康检查"""
         health_status = {
             'status': 'healthy',
             'timestamp': time.time(),
@@ -2089,13 +2261,11 @@ class DatabaseManager:
         }
         
         try:
-            # 检查初始化状态
             health_status['checks']['initialization'] = {
                 'status': 'pass' if self._initialized else 'fail',
                 'message': 'System initialized' if self._initialized else 'System not initialized'
             }
             
-            # 检查数据库注册表
             try:
                 db_count = len(self.list_databases())
                 health_status['checks']['database_registry'] = {
@@ -2109,7 +2279,6 @@ class DatabaseManager:
                     'message': f'Registry error: {str(e)}'
                 }
             
-            # 检查线程池
             try:
                 if hasattr(self.executor, '_shutdown') and self.executor._shutdown:
                     health_status['checks']['thread_pool'] = {
@@ -2127,7 +2296,6 @@ class DatabaseManager:
                     'message': f'Thread pool error: {str(e)}'
                 }
             
-            # 检查连接池
             try:
                 with self.pool_lock:
                     pool_count = len(self.connection_pools)
@@ -2142,7 +2310,6 @@ class DatabaseManager:
                     'message': f'Connection pool error: {str(e)}'
                 }
             
-            # 检查缓存
             try:
                 cache_stats = self.cache.get_cache_stats()
                 total_size = cache_stats.get('total_size', 0)
@@ -2157,7 +2324,6 @@ class DatabaseManager:
                     'message': f'Cache error: {str(e)}'
                 }
             
-            # 检查清理定时器
             timer_status = (self._cleanup_timer is not None and 
                           self._cleanup_timer.is_alive() and 
                           not self._shutdown_requested)
@@ -2167,7 +2333,6 @@ class DatabaseManager:
                 'message': 'Cleanup timer running' if timer_status else 'Cleanup timer not running'
             }
             
-            # 综合状态评估
             failed_checks = [name for name, check in health_status['checks'].items() 
                            if check['status'] == 'fail']
             warning_checks = [name for name, check in health_status['checks'].items() 
@@ -2187,20 +2352,15 @@ class DatabaseManager:
         
         return health_status
     
-
-    
     def __enter__(self):
-        """上下文管理器进入"""
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器退出"""
         self.close()
     
     def __del__(self):
-        """析构函数"""
         try:
             if hasattr(self, '_initialized') and self._initialized and not self._shutdown_requested:
                 self.close()
         except Exception:
-            pass  # 忽略析构函数中的异常
+            pass

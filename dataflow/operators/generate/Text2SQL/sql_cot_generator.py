@@ -16,7 +16,8 @@ class CoTGenerator(OperatorABC):
                 database_manager: DatabaseManager,
                 schema_config: Optional[Dict] = None,
                 max_retries: int = 3,
-                enable_retry: bool = True
+                enable_retry: bool = True,
+                timeout: int = 5
                  ):
         self.llm_serving = llm_serving
         self.database_manager = database_manager
@@ -31,6 +32,7 @@ class CoTGenerator(OperatorABC):
             self.schema_config = schema_config
         self.max_retries = max_retries
         self.enable_retry = enable_retry
+        self.timeout = timeout
         self._validate_config()
 
     @staticmethod
@@ -160,7 +162,7 @@ class CoTGenerator(OperatorABC):
                         'db_id': db_id,
                         'sql1': generated_sql,
                         'sql2': gold_sql,
-                        'timeout': 5.0,
+                        'timeout': self.timeout,
                         'operation_id': f"{db_id}_{len(valid_items_with_responses)}"
                     })
                     valid_items_with_responses.append((item, response, generated_sql))

@@ -51,9 +51,6 @@ class ConsistencyFilter(OperatorABC):
     def generate_consistency_prompt(self, question, sql, schema):
         return self.prompt.text_sql_consistency_prompt(question, sql, schema)
 
-    def get_schema_for_db(self, db_id: str) -> Dict:
-        return self.database_manager.get_database_schema(db_id)
-
     def format_schema_according_to_config(self, db_id: str) -> str:
         return self.database_manager.generate_ddl_without_examples(db_id)
 
