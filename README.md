@@ -102,6 +102,16 @@ open-dataflow codebase version: 1.0.0
 You are using the latest version: 1.0.0.
 ```
 
+### Using Gradio to Test DataFlow Operators
+
+You can quickly launch a Gradio-based interface to test DataFlow operators with the following command:
+
+```bash
+dataflow webui
+```
+
+This will start an interactive web UI, allowing you to visualize all operators seamlessly.
+
 For **Quick-Start** and **Guide**, please visit our [Documentation](https://OpenDCAI.github.io/DataFlow-Doc/). 
 
 [![Documents](https://img.shields.io/badge/Documents-Click_here-brightgreen?logo=read-the-docs)](https://OpenDCAI.github.io/DataFlow-Doc/)
