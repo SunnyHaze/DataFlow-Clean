@@ -6,6 +6,7 @@ from dataflow.core import LLMServingABC
 
 from typing import Literal
 import pandas as pd
+from dataflow.prompts.reasoning.math import MathAnswerGeneratorPrompt
 
 @OPERATOR_REGISTRY.register()
 class AnswerGenerator(OperatorABC):
@@ -14,11 +15,13 @@ class AnswerGenerator(OperatorABC):
     '''
     def __init__(self,
                 llm_serving: LLMServingABC,
-                prompt_template: None,
+                prompt_template = None,
                 ):
         
         self.logger = get_logger()
         
+        if prompt_template is None:
+            prompt_template = MathAnswerGeneratorPrompt()
         self.prompts = prompt_template
         self.llm_serving = llm_serving
         
