@@ -18,10 +18,6 @@ class QuickEvaluatePipeline():
         
         
     def forward(self):
-        self.llm_language_filter.run(
-            self.storage.step(),
-            input_key='raw_content'
-        )
         self.meta_scorer.run(
             self.storage.step(),
             input_key='raw_content'
