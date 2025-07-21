@@ -1691,46 +1691,53 @@ class DatabaseManager:
         discovered_count = 0
         
         try:
+            # 首先收集所有符合条件的文件
+            all_files = []
             for ext in extensions:
                 pattern = os.path.join(root_path, '**', ext)
-                files = list(glob.glob(pattern, recursive=True))
-                
-                for db_file in tqdm(files, desc=f"Discovering {ext} databases"):
-                    if os.path.isfile(db_file):
-                        try:
-                            # 生成唯一的数据库ID，包含相对路径以避免冲突
-                            relative_path = os.path.relpath(db_file, root_path)
-                            db_id = os.path.splitext(relative_path.replace(os.sep, '_'))[0]
-                            
-                            # 确保ID唯一性
-                            original_db_id = db_id
-                            counter = 1
-                            while self.registry.database_exists(db_id):
-                                db_id = f"{original_db_id}_{counter}"
-                                counter += 1
-                            
-                            # 验证文件是否为有效的SQLite数据库
-                            if self._validate_sqlite_file(db_file):
-                                db_info = DatabaseInfo(
-                                    db_id=db_id,
-                                    db_type='sqlite',
-                                    connection_info={'path': db_file},
-                                    metadata={
-                                        'size': os.path.getsize(db_file),
-                                        'modified_time': os.path.getmtime(db_file),
-                                        'relative_path': relative_path
-                                    }
-                                )
-                                self.registry.register_database(db_info)
-                                discovered_count += 1
-                                self.logger.debug(f"Registered SQLite database: {db_id} -> {db_file}")
-                            else:
-                                self.logger.debug(f"Skipped invalid SQLite file: {db_file}")
-                                
-                        except Exception as e:
-                            self.logger.warning(f"Failed to register database {db_file}: {e}")
+                files = glob.glob(pattern, recursive=True)
+                all_files.extend(files)
             
-            self.logger.info(f"Discovered {discovered_count} SQLite databases")
+            # 去重（可能有文件被多个模式匹配到）
+            all_files = list(set(all_files))
+            
+            # 统一遍历所有发现的文件
+            for db_file in tqdm(all_files, desc="Discovering SQLite databases"):
+                if os.path.isfile(db_file):
+                    try:
+                        # 生成唯一的数据库ID，包含相对路径以避免冲突
+                        relative_path = os.path.relpath(db_file, root_path)
+                        db_id = os.path.splitext(relative_path.replace(os.sep, '_'))[0]
+                            
+                        # 确保ID唯一性
+                        original_db_id = db_id
+                        counter = 1
+                        while self.registry.database_exists(db_id):
+                            db_id = f"{original_db_id}_{counter}"
+                            counter += 1
+                            
+                        # 验证文件是否为有效的SQLite数据库
+                        if self._validate_sqlite_file(db_file):
+                            db_info = DatabaseInfo(
+                                db_id=db_id,
+                                db_type='sqlite',
+                                connection_info={'path': db_file},
+                                metadata={
+                                    'size': os.path.getsize(db_file),
+                                    'modified_time': os.path.getmtime(db_file),
+                                    'relative_path': relative_path
+                                }
+                            )
+                            self.registry.register_database(db_info)
+                            discovered_count += 1
+                            self.logger.debug(f"Registered SQLite database: {db_id} -> {db_file}")
+                        else:
+                            self.logger.debug(f"Skipped invalid SQLite file: {db_file}")
+                                
+                    except Exception as e:
+                        self.logger.warning(f"Failed to register database {db_file}: {e}")
+            
+            self.logger.info(f"Discovered {discovered_count} SQLite databases from {len(all_files)} files")
             
         except Exception as e:
             self.logger.error(f"Error during SQLite database discovery: {e}")
