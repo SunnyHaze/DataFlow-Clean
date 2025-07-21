@@ -960,7 +960,7 @@ class DatabaseManager:
                  logger=None, max_connections_per_db=5, max_workers=16):
         self.db_type = db_type.lower()
         self.config = config or {}
-        self.logger = logger or get_logger()
+        self.logger = logger if logger else get_logger()
         self.max_connections_per_db = max_connections_per_db
         self.max_workers = max_workers
         
