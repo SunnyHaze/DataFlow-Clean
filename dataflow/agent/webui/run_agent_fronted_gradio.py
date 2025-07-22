@@ -8,7 +8,7 @@ import gradio as gr
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse, JSONResponse
 import uvicorn
-from run_dataflow_agent_with_ui import app as backend_app
+from .run_dataflow_agent_with_ui import app as backend_app
 def build_payload(
     language, target, model, session_key,
     json_file, py_path, api_key, chat_api,
@@ -133,7 +133,7 @@ with gr.Blocks(title="DataFlow-Agent") as demo:
     gr.Markdown("## 🛠️ DataFlow-Agent 算子编写 + 管线推荐")
 
     with gr.Row():
-        api_base = gr.Textbox(label="后端地址", value="http://127.0.0.1:7860/api")
+        api_base = gr.Textbox(label="后端地址", value="http://127.0.0.1:7862/api")
         language = gr.Dropdown(["zh", "en"], value="zh", label="Language")
         model    = gr.Textbox(label="LLM Model", value="deepseek-v3")
 
@@ -212,4 +212,4 @@ async def _manifest():
 # 运行
 # ------------------------------------------------------------------
 if __name__ == "__main__":
-    uvicorn.run(root, host="0.0.0.0", port=7860)
+    uvicorn.run(root, host="0.0.0.0", port=7862)
