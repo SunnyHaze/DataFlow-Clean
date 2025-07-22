@@ -46,6 +46,9 @@ if TYPE_CHECKING:
     from .RARE.doc_to_query import Doc2Query
     from .RARE.bm25_hard_negative import BM25HardNeg
     from .RARE.reason_distill import ReasonDistill
+
+    #VQA
+    from .VQA.PromptedVQAGenerator import PromptedVQAGenerator
 else:
     import sys
     from dataflow.utils.registry import LazyLoader, generate_import_structure_from_type_checking
