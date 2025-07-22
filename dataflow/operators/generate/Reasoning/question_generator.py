@@ -6,6 +6,7 @@ from dataflow.core import OperatorABC
 from dataflow.core import LLMServingABC
 import pandas as pd
 import random
+from dataflow.prompts.reasoning.math import MathQuestionSynthesisPrompt
 
 @OPERATOR_REGISTRY.register()
 class QuestionGenerator(OperatorABC):
@@ -19,6 +20,8 @@ class QuestionGenerator(OperatorABC):
         """
         self.logger = get_logger()
         
+        if prompt_template is None:
+            prompt_template = MathQuestionSynthesisPrompt()
         self.prompts = prompt_template
         self.num_prompts = num_prompts
         self.llm_serving = llm_serving

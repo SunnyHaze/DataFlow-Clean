@@ -7,7 +7,7 @@ from dataflow.operators.generate import (
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import LocalModelLLMServing_vllm
 
-class KBCleaningPipeline():
+class KBCleaning_PDFvllm_GPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -42,7 +42,7 @@ class KBCleaningPipeline():
             output_key="raw_content",
         )
 
-        local_llm_serving = LocalModelLLMServing_vllm(
+        self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct",
             vllm_max_tokens=2048,
             vllm_tensor_parallel_size=4,
@@ -51,12 +51,12 @@ class KBCleaningPipeline():
         )
 
         self.knowledge_cleaning_step3 = KnowledgeCleaner(
-            llm_serving=local_llm_serving,
+            llm_serving=self.llm_serving,
             lang="en"
         )
 
         self.knowledge_cleaning_step4 = MultiHopQAGenerator(
-            llm_serving=local_llm_serving,
+            llm_serving=self.llm_serving,
             lang="en"
         )
 
@@ -72,5 +72,5 @@ class KBCleaningPipeline():
         )
         
 if __name__ == "__main__":
-    model = KBCleaningPipeline()
+    model = KBCleaning_PDFvllm_GPUPipeline()
     model.forward(raw_file="../example_data/KBCleaningPipeline/test.pdf")

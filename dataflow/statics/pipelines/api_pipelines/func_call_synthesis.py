@@ -11,7 +11,7 @@ from dataflow.operators.conversations import (
     MultiTurnConversationGenerator
 )
 
-class FuncCallPipeline:
+class FuncCall_APIPipeline:
     def __init__(self):
 
         self.storage = FileStorage(
@@ -81,5 +81,5 @@ class FuncCallPipeline:
     
 
 if __name__ == "__main__":
-    pipeline = FuncCallPipeline()
+    pipeline = FuncCall_APIPipeline()
     pipeline.run()

@@ -3,6 +3,7 @@ from dataflow import get_logger
 from dataflow.core import OperatorABC
 from dataflow.utils.storage import DataFlowStorage
 from dataflow.core import LLMServingABC
+from dataflow.prompts.reasoning.math import MathQuestionFilterPrompt
 
 import re
 
@@ -16,6 +17,8 @@ class QuestionFilter(OperatorABC):
 
         self.logger = get_logger()
         
+        if prompt_template is None:
+            prompt_template = MathQuestionFilterPrompt()
         self.prompt_template = prompt_template
         self.system_prompt = system_prompt
         self.llm_serving = llm_serving

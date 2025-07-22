@@ -99,6 +99,16 @@ open-dataflow codebase version: 1.0.0
 You are using the latest version: 1.0.0.
 ```
 
+### 尝试使用Gradio部署Dataflow算子
+
+你可以使用以下命令快速启动基于 Gradio 的界面来测试 DataFlow 算子：
+
+```bash
+dataflow webui
+```
+
+该命令将启动一个交互式 Web 界面，使你能够无缝可视化所有算子。
+
 更多使用说明和入门指南，请参考我们的 [项目文档](https://OpenDCAI.github.io/DataFlow-Doc/)。
 
 [![Documents](https://img.shields.io/badge/官方文档-单击此处-brightgreen?logo=read-the-docs)](https://OpenDCAI.github.io/DataFlow-Doc/)

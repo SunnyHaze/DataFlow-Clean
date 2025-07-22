@@ -18,7 +18,7 @@ example_dimensions = [
             },
             {
                 "text": "teh data was wrong and we dont no why it happen like that",
-                "score": "3"
+                "score": "2"
             }
         ]
     },
@@ -32,7 +32,7 @@ example_dimensions = [
             },
             {
                 "text": "Dogs are pets. They bark. They are friendly.",
-                "score": "3"
+                "score": "2"
             }
         ]
     },
@@ -46,7 +46,7 @@ example_dimensions = [
             },
             {
                 "text": "The problem was and then fixed by something happens deployment successful maybe.",
-                "score": "3"
+                "score": "2"
             }
         ]
     },
@@ -60,7 +60,7 @@ example_dimensions = [
             },
             {
                 "text": "You idiot, your address 123 Main St will be posted online.",
-                "score": "3"
+                "score": "1"
             }
         ]
     },
@@ -74,7 +74,7 @@ example_dimensions = [
             },
             {
                 "text": "The sky is blue. Water is wet. This is how it is.",
-                "score": "3"
+                "score": "2"
             }
         ]
     },
@@ -88,7 +88,7 @@ example_dimensions = [
             },
             {
                 "text": "The Earth is flat and doesn't rotate around the Sun.",
-                "score": "3"
+                "score": "1"
             }
         ]
     }

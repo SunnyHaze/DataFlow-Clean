@@ -42,7 +42,7 @@ DIY_PROMPT_SYNTHESIS = """
     
 DIY_PROMPT_ANSWER = """Please firstly output a symbol "Yeah, It is the answer:", and then output the answer."""
 
-class DiyReasoningPipeline():
+class DiyReasoning_APIPipeline():
     def __init__(self, llm_serving: LLMServingABC = None):
         
         self.storage = FileStorage(
@@ -53,7 +53,7 @@ class DiyReasoningPipeline():
         )
 
         # use API server as LLM serving
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
                     api_url="http://api.openai.com/v1/chat/completions",
                     model_name="gpt-4o",
                     max_workers=30
@@ -61,18 +61,18 @@ class DiyReasoningPipeline():
 
         self.question_filter_step1 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=DiyQuestionFilterPrompt(DIY_PROMPT_QUESTION)
         )
         
         self.question_gen_step2 =  QuestionGenerator(
             num_prompts=1,
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=DiyQuestionSynthesisPrompt(DIY_PROMPT_SYNTHESIS)
         )
         
         self.answer_generator_step3 = AnswerGenerator(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=DiyAnswerGeneratorPrompt(DIY_PROMPT_ANSWER)
         )
         
@@ -104,5 +104,5 @@ class DiyReasoningPipeline():
         )
 
 if __name__ == "__main__":
-    pl = DiyReasoningPipeline()
+    pl = DiyReasoning_APIPipeline()
     pl.forward()

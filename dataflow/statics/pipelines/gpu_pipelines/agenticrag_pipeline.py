@@ -12,7 +12,7 @@ from dataflow.utils.storage import FileStorage
 from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 
 
-class AgenticRAGPipeline():
+class AgenticRAG_GPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -23,7 +23,7 @@ class AgenticRAGPipeline():
         )
 
         # use vllm as LLM serving
-        llm_serving = LocalModelLLMServing_vllm(
+        self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen2.5-7B-Instruct", # set to your own model path
             vllm_tensor_parallel_size=4,
             vllm_max_tokens=8192,
@@ -41,11 +41,11 @@ class AgenticRAGPipeline():
         embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
         self.content_chooser_step1 = ContentChooser(embedding_serving=embedding_serving, num_samples=5, method="random")
 
-        self.prompt_generator_step2 = AutoPromptGenerator(llm_serving)
+        self.prompt_generator_step2 = AutoPromptGenerator(self.llm_serving)
 
-        self.qa_generator_step3 = QAGenerator(llm_serving)
+        self.qa_generator_step3 = QAGenerator(self.llm_serving)
 
-        self.qa_scorer_step4 = QAScorer(llm_serving)
+        self.qa_scorer_step4 = QAScorer(self.llm_serving)
         
     def forward(self):
 
@@ -79,5 +79,5 @@ class AgenticRAGPipeline():
         )
         
 if __name__ == "__main__":
-    model = AgenticRAGPipeline()
+    model = AgenticRAG_GPUPipeline()
     model.forward()

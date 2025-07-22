@@ -33,7 +33,7 @@ from dataflow.operators.generate import PretrainGenerator
 from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 from dataflow.utils.storage import FileStorage
 
-class PTTextSynPipeline():
+class PTTextSynthetic_GPUPipeline():
     def __init__(self):
         self.storage = FileStorage(
             first_entry_file_name="../example_data/GeneralTextPipeline/pt_input.jsonl",
@@ -209,5 +209,5 @@ class PTTextSynPipeline():
             input_key='generated_content'
         )
 if __name__ == "__main__":
-    model = PTTextSynPipeline()
+    model = PTTextSynthetic_GPUPipeline()
     model.forward()
