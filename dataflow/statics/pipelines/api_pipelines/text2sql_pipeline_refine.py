@@ -1,23 +1,23 @@
 from dataflow.operators.generate import (
     SQLVariationGenerator,
-    QuestionGeneration,
-    PromptGenerator,
-    CoTGenerator
+    Text2SQLQuestionGenerator,
+    Text2SQLPromptGenerator,
+    Text2SQLCoTGenerator
 )
 from dataflow.operators.filter import (
-    ExecutionFilter,
-    ConsistencyFilter
+    SQLExecutionFilter,
+    SQLConsistencyFilter
 )
 from dataflow.operators.eval import (
-    ComponentClassifier,
-    ExecutionClassifier
+    SQLComponentClassifier,
+    SQLExecutionClassifier
 )
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
-class Text2SQLPipeline():
+class Text2SQLRefine_APIPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -27,7 +27,7 @@ class Text2SQLPipeline():
             cache_type="jsonl"
         )
 
-        api_llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
             api_url="http://api.openai.com/v1/chat/completions",
             model_name="gpt-4o",
             max_workers=100
@@ -67,12 +67,15 @@ class Text2SQLPipeline():
         # You can customize the schema config here, but it must contain 'format' and 'use_example' keys
         schema_config = {
             'format': 'ddl',  # Optional: 'ddl', 'formatted_schema'
-            'use_example': False  # Whether to include example data
+            'use_example': True  # Whether to include example data
         }
 
         # A demo database is provided. Download it from the following URL and update the path:  
         # https://huggingface.co/datasets/Open-Dataflow/dataflow-Text2SQL-database-example  
-        db_root_path = ""  
+        db_root_path = ""
+
+        # SQL execution timeout. Generated SQL execution time should be less than this value.
+        sql_execution_timeout = 2
 
         # SQLite and MySQL are currently supported
         # db_type can be sqlite or mysql, which must match your database type
@@ -93,58 +96,65 @@ class Text2SQLPipeline():
             db_type="sqlite",
             config={
                 "root_path": db_root_path
-            }
+            },
+            logger=None,
+            max_connections_per_db=100,
+            max_workers=100
         )
         
-        self.sql_execution_filter_step1 = ExecutionFilter(
-            database_manager=database_manager
+        self.sql_execution_filter_step1 = SQLExecutionFilter(
+            database_manager=database_manager,
+            timeout=sql_execution_timeout
         )
 
-        self.sql_consistency_filter_step2 = ConsistencyFilter(
-            llm_serving=api_llm_serving,
+        self.sql_consistency_filter_step2 = SQLConsistencyFilter(
+            llm_serving=self.llm_serving,
             database_manager=database_manager
         )
 
         self.sql_variation_generator_step3 = SQLVariationGenerator(
-            llm_serving=api_llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             num_variations=5
         )
 
-        self.sql_execution_filter_step4 = ExecutionFilter(
-            database_manager=database_manager
+        self.sql_execution_filter_step4 = SQLExecutionFilter(
+            database_manager=database_manager,
+            timeout=sql_execution_timeout
         )
 
-        self.text2sql_question_generator_step5 = QuestionGeneration(
-            llm_serving=api_llm_serving,
+        self.text2sql_question_generator_step5 = Text2SQLQuestionGenerator(
+            llm_serving=self.llm_serving,
             embedding_serving=embedding_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )
 
-        self.text2sql_prompt_generator_step6 = PromptGenerator(
+        self.text2sql_prompt_generator_step6 = Text2SQLPromptGenerator(
             database_manager=database_manager,
             prompt_template=prompt_template,
             schema_config=schema_config
         )
 
-        self.sql_cot_generator_step7 = CoTGenerator(
+        self.sql_cot_generator_step7 = Text2SQLCoTGenerator(
             llm_serving=cot_generation_api_llm_serving,
             database_manager=database_manager,
             schema_config=schema_config,
             max_retries=3,
-            enable_retry=True
+            enable_retry=True,
+            timeout=sql_execution_timeout
         )
 
-        self.sql_component_classifier_step8 = ComponentClassifier(
+        self.sql_component_classifier_step8 = SQLComponentClassifier(
             difficulty_config=component_difficulty_config
         )
 
-        self.sql_execution_classifier_step9 = ExecutionClassifier(
-            llm_serving=api_llm_serving,
+        self.sql_execution_classifier_step9 = SQLExecutionClassifier(
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             difficulty_config=execution_difficulty_config,
-            num_generations=5
+            num_generations=5,
+            timeout=sql_execution_timeout
         )
         
         
@@ -216,6 +226,6 @@ class Text2SQLPipeline():
         )
 
 if __name__ == "__main__":
-    model = Text2SQLPipeline()
+    model = Text2SQLRefine_APIPipeline()
     model.forward()
 

@@ -1,17 +1,17 @@
 from dataflow.operators.generate import (
-    PromptGenerator
+    Text2SQLPromptGenerator
 )
 from dataflow.operators.filter import (
-    ExecutionFilter
+    SQLExecutionFilter
 )
 from dataflow.operators.eval import (
-    ComponentClassifier
+    SQLComponentClassifier
 )
 from dataflow.utils.storage import FileStorage
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
-class Text2SQLPipeline():
+class Text2SQL_CPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -42,7 +42,10 @@ class Text2SQLPipeline():
 
         # A demo database is provided. Download it from the following URL and update the path:  
         # https://huggingface.co/datasets/Open-Dataflow/dataflow-Text2SQL-database-example  
-        db_root_path = ""  
+        db_root_path = ""
+
+        # SQL execution timeout. Generated SQL execution time should be less than this value.
+        sql_execution_timeout = 2
 
         # SQLite and MySQL are currently supported
         # db_type can be sqlite or mysql, which must match your database type
@@ -63,20 +66,24 @@ class Text2SQLPipeline():
             db_type="sqlite",
             config={
                 "root_path": db_root_path
-            }
+            },
+            logger=None,
+            max_connections_per_db=100,
+            max_workers=100
         )
 
-        self.sql_execution_filter_step1 = ExecutionFilter(
-            database_manager=database_manager
+        self.sql_execution_filter_step1 = SQLExecutionFilter(
+            database_manager=database_manager,
+            timeout=sql_execution_timeout
         )
 
-        self.text2sql_prompt_generator_step2 = PromptGenerator(
+        self.text2sql_prompt_generator_step2 = Text2SQLPromptGenerator(
             database_manager=database_manager,
             prompt_template=prompt_template,
             schema_config=schema_config
         )
 
-        self.sql_component_classifier_step3 = ComponentClassifier(
+        self.sql_component_classifier_step3 = SQLComponentClassifier(
             difficulty_config=component_difficulty_config
         )
         
@@ -108,6 +115,6 @@ class Text2SQLPipeline():
 
 
 if __name__ == "__main__":
-    model = Text2SQLPipeline()
+    model = Text2SQL_CPUPipeline()
     model.forward()
 

@@ -18,7 +18,7 @@
 [简体中文](./README-zh.md) | English
 
 
-**[🚀 Features](#Features) • [⚡ Quick Start](#Quick_Start) • [📖 Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 Experiments](#Experiments)**
+**[🚀 Features](#-3-pipelines-functionality) • [⚡ Quick Start](#-4-quick-start) • [📖 Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 Experiments](#-5-experimental-results)**
 
 </div>
 
@@ -146,7 +146,7 @@ We verify our reasoning pipeline by SFT on a Qwen2.5-32B-Instruct with Reasoning
 </div>
 
 ### 🗃️ 5.3 Text2SQL PipeLine
-We fine-tuned the Qwen2.5-Coder-14B model on the Bird dataset using both Supervised Fine-tuning (SFT) and Reinforcement Learning (RL), with data constructed via the DataFlow-Text2SQL Pipeline. Results are:
+We fine-tuned the Qwen2.5-Coder-7B-Instruct model using both Supervised Fine-tuning (SFT) and Reinforcement Learning (RL), with data constructed via the DataFlow-Text2SQL Pipeline. Results are:
 
 <div align="center">
   <img src="./static/images/text2sql.png" width="60%">

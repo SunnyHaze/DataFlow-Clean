@@ -24,7 +24,7 @@ from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 from dataflow.core import LLMServingABC
 
 # 这里或许未来可以有个pipeline基类
-class ReasoningPipeline():
+class ReasoningMath_APIPipeline():
     def __init__(self, llm_serving: LLMServingABC = None):
 
         self.storage = FileStorage(
@@ -35,7 +35,7 @@ class ReasoningPipeline():
         )
 
         # use API server as LLM serving
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
                 api_url="http://api.openai.com/v1/chat/completions",
                 model_name="gpt-4o",
                 max_workers=100
@@ -53,30 +53,30 @@ class ReasoningPipeline():
 
         self.question_filter_step1 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionFilterPrompt()
         )
         self.question_gen_step2 =  QuestionGenerator(
             num_prompts=3,
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionSynthesisPrompt()
         )
         self.question_filter_step3 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionFilterPrompt()
         )
         self.question_difficulty_classifier_step4 = QuestionDifficultyClassifier(
-            llm_serving=llm_serving
+            llm_serving=self.llm_serving
         )
         self.question_category_classifier_step5 = QuestionCategoryClassifier(
-            llm_serving=llm_serving
+            llm_serving=self.llm_serving
         )
         ########################## branch ############################
         # self.answer_pipeline_root_step6 = AnswerPipelineRoot()
         ########################## answer ############################
         self.answer_generator_step7 = AnswerGenerator(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathAnswerGeneratorPrompt()
         )
         
@@ -156,5 +156,5 @@ class ReasoningPipeline():
         )
 
 if __name__ == "__main__":
-    model = ReasoningPipeline()
+    model = ReasoningMath_APIPipeline()
     model.forward()
