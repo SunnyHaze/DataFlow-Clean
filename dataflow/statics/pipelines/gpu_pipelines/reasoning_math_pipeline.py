@@ -23,7 +23,7 @@ from dataflow.prompts.reasoning.math import (
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 
-class ReasoningPipeline():
+class ReasoningMath_GPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -33,7 +33,7 @@ class ReasoningPipeline():
             cache_type="jsonl",
         )
         # use vllm as LLM serving
-        llm_serving = LocalModelLLMServing_vllm(
+        self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
             vllm_tensor_parallel_size=1,
             vllm_max_tokens=8192,
@@ -49,30 +49,30 @@ class ReasoningPipeline():
 
         self.question_filter_step1 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionFilterPrompt()
         )
         self.question_gen_step2 =  QuestionGenerator(
             num_prompts=3,
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionSynthesisPrompt()
         )
         self.question_filter_step3 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionFilterPrompt()
         )
         self.question_difficulty_classifier_step4 = QuestionDifficultyClassifier(
-            llm_serving=llm_serving
+            llm_serving=self.llm_serving
         )
         self.question_category_classifier_step5 = QuestionCategoryClassifier(
-            llm_serving=llm_serving
+            llm_serving=self.llm_serving
         )
         ########################## branch ############################
         # self.answer_pipeline_root_step6 = AnswerPipelineRoot()
         ########################## answer ############################
         self.answer_generator_step7 = AnswerGenerator(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathAnswerGeneratorPrompt()
         )
         
@@ -151,5 +151,5 @@ class ReasoningPipeline():
         )
 
 if __name__ == "__main__":
-    model = ReasoningPipeline()
+    model = ReasoningMath_GPUPipeline()
     model.forward()

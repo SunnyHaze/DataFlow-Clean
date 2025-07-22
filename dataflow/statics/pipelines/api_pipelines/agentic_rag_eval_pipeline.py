@@ -11,7 +11,7 @@ from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 from dataflow.core import LLMServingABC
 
-class AgenticRAGEvalPipeline():
+class AgenticRAGEval_APIPipeline():
 
     def __init__(self, llm_serving=None):
 
@@ -22,14 +22,14 @@ class AgenticRAGEvalPipeline():
             cache_type="jsonl",
         )
 
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
             api_url="https://api.openai.com/v1/chat/completions",
             model_name="gpt-4o-mini",
             max_workers=500
         )
 
         self.task_step1 = AtomicTaskGenerator(
-            llm_serving=llm_serving
+            llm_serving=self.llm_serving
         )
 
         self.task_step2 = F1Scorer()
@@ -49,5 +49,5 @@ class AgenticRAGEvalPipeline():
         )
 
 if __name__ == "__main__":
-    model = AgenticRAGEvalPipeline()
+    model = AgenticRAGEval_APIPipeline()
     model.forward()

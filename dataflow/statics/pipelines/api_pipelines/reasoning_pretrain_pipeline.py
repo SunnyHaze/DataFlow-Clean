@@ -13,7 +13,7 @@ from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 
 # 这里或许未来可以有个pipeline基类
-class ReasoningPipeline_Pretrain():
+class Reasoning_APIPipeline_Pretrain():
     def __init__(self, llm_serving=None):
 
         self.storage = FileStorage(
@@ -24,7 +24,7 @@ class ReasoningPipeline_Pretrain():
         )
         if llm_serving is None:
             # use API server as LLM serving
-            llm_serving = APILLMServing_request(
+            self.llm_serving = APILLMServing_request(
                     api_url="http://api.openai.com/v1/chat/completions",
                     model_name="gpt-4o",
                     max_workers=100
@@ -41,12 +41,12 @@ class ReasoningPipeline_Pretrain():
         
         self.question_filter_step1 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionFilterPrompt()
         )
         self.question_gen_step2 =  QuestionGenerator(
             num_prompts=3,
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionSynthesisPrompt()
         )
         
@@ -54,7 +54,7 @@ class ReasoningPipeline_Pretrain():
         self.answer_pipeline_root_step3 = AnswerPipelineRoot()
         ########################## answer ############################
         self.answer_generator_step4 = AnswerGenerator(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathAnswerGeneratorPrompt()
         )
         
@@ -104,6 +104,6 @@ class ReasoningPipeline_Pretrain():
             )
 
 if __name__ == "__main__":
-    pipeline = ReasoningPipeline_Pretrain()
+    pipeline = Reasoning_APIPipeline_Pretrain()
     pipeline.forward()
 

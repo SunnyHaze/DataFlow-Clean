@@ -3,7 +3,7 @@ from dataflow.operators.generate import (
     FileOrURLToMarkdownConverter,
 )
 from dataflow.utils.storage import FileStorage
-class KBCleaningPipeline():
+class KBCleaning_CPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -38,6 +38,6 @@ class KBCleaningPipeline():
         )
 
 if __name__ == "__main__":
-    model = KBCleaningPipeline()
+    model = KBCleaning_CPUPipeline()
     model.forward(url="https://trafilatura.readthedocs.io/en/latest/quickstart.html")
 
