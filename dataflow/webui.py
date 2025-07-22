@@ -160,7 +160,6 @@ class DynamicOperatorSystem:
                 model_name=kwargs.get("model_name"),
                 max_workers=int(kwargs.get("max_workers", 2)),
             )
-        # 保持本地兼容
         from dataflow.serving.LocalModelLLMServing import LocalModelLLMServing_vllm
         return LocalModelLLMServing_vllm(
             hf_model_name_or_path=kwargs.get("model_path"),
@@ -181,9 +180,9 @@ class DynamicOperatorSystem:
 dynamic_system = DynamicOperatorSystem()
 
 # =========================
-# 界面文本（中文）
+# 中英文文案字典
 # =========================
-t = {
+zh_t = {
     "header": "# DataFlow 动态算子和Pipeline可视化",
     "operators_mode": "算子模式",
     "pipelines_mode": "Pipeline模式",
@@ -218,11 +217,121 @@ t = {
     "api_pipeline_section": "### API Pipeline 配置",
     "pipeline_input_file": "Pipeline 输入文件路径",
 }
-lang = "中文"
-current_t = t
+
+en_t = {
+    "header": "# DataFlow Dynamic Operators and Pipeline Visualization",
+    "operators_mode": "Operators Mode",
+    "pipelines_mode": "Pipeline Mode",
+    "mode_switch": "Switch Mode",
+    "select_operator": "Select Operator",
+    "select_pipeline": "Select Pipeline",
+    "desc_placeholder": "Description appears here",
+    "init_section": "## Initialization Parameters (except llm_serving)",
+    "other_init": "Other init params (JSON)",
+    "call_method": "Call Method",
+    "api_section": "### API Parameters",
+    "api_url": "API URL",
+    "model_name": "Model Name",
+    "api_key": "API Key",
+    "max_workers": "Max Workers",
+    "local_section": "### Local Model Parameters",
+    "local_model_path": "Local Model Path",
+    "tensor_parallel_size": "Tensor Parallel Size",
+    "temperature": "Temperature",
+    "top_p": "Top P",
+    "max_tokens": "Max Tokens",
+    "storage_section": "## Storage Parameters",
+    "input_file_path": "Input File Path",
+    "cache_path": "Cache Path",
+    "file_name_prefix": "File Name Prefix",
+    "run_section": "## Run Parameters",
+    "run_params": "Run Params (JSON)",
+    "run_button": "Run Operator",
+    "run_pipeline_button": "Run Pipeline",
+    "summary": "Execution Summary",
+    "preview": "Top 5 Preview (wrapped)",
+    "api_pipeline_section": "### API Pipeline Config",
+    "pipeline_input_file": "Pipeline Input File",
+}
+
+# 默认中文
+current_t = zh_t
 
 # =========================
-# 回调函数
+# 回调：切换语言
+# =========================
+def switch_language(lang):
+    global current_t
+    current_t = zh_t if lang == "中文" else en_t
+    return (
+        # 1. 顶部标题
+        gr.update(value=current_t["header"]),
+        # 2. 模式切换控件
+        gr.update(choices=[current_t["operators_mode"], current_t["pipelines_mode"]],
+                  label=current_t["mode_switch"],
+                  value=current_t["operators_mode"]),
+        # 3. 算子选择下拉
+        gr.update(label=current_t["select_operator"]),
+        # 4. Pipeline 选择下拉
+        gr.update(label=current_t["select_pipeline"]),
+        # 5. 算子描述 Markdown
+        gr.update(value=current_t["desc_placeholder"]),
+        # 6. Pipeline 描述 Markdown
+        gr.update(value=current_t["desc_placeholder"]),
+        # 7. 初始化参数区域标题
+        gr.update(value=current_t["init_section"]),
+        # 8. init_editor 标签
+        gr.update(label=current_t["other_init"]),
+        # 9. 调用方式单选
+        gr.update(label=current_t["call_method"],
+                  choices=[current_t["api_section"], current_t["local_section"]],
+                  value=current_t["api_section"]),
+        # 10. API 参数区域标题
+        gr.update(value=current_t["api_section"]),
+        # 11–14. API 参数输入框
+        gr.update(label=current_t["api_url"]),
+        gr.update(label=current_t["model_name"]),
+        gr.update(label=current_t["api_key"]),
+        gr.update(label=current_t["max_workers"]),
+        # 15. 本地模型参数区域标题
+        gr.update(value=current_t["local_section"]),
+        # 16–20. 本地模型参数输入框
+        gr.update(label=current_t["local_model_path"]),
+        gr.update(label=current_t["tensor_parallel_size"]),
+        gr.update(label=current_t["temperature"]),
+        gr.update(label=current_t["top_p"]),
+        gr.update(label=current_t["max_tokens"]),
+        # 21. 算子存储区域标题
+        gr.update(value=current_t["storage_section"]),
+        # 22–24. 算子存储输入框
+        gr.update(label=current_t["input_file_path"]),
+        gr.update(label=current_t["cache_path"]),
+        gr.update(label=current_t["file_name_prefix"]),
+        # 25. 运行参数区域标题
+        gr.update(value=current_t["run_section"]),
+        # 26. run_editor 标签
+        gr.update(label=current_t["run_params"]),
+        # 27. API Pipeline 区域标题
+        gr.update(value=current_t["api_pipeline_section"]),
+        # 28. pipeline_input_file 标签
+        gr.update(label=current_t["pipeline_input_file"]),
+        # 29. Pipeline 存储区域标题
+        gr.update(value=current_t["storage_section"]),
+        # 30–31. Pipeline 存储输入框
+        gr.update(label=current_t["cache_path"]),
+        gr.update(label=current_t["file_name_prefix"]),
+        # 32–35. Pipeline API 输入框
+        gr.update(label=current_t["api_url"]),
+        gr.update(label=current_t["model_name"]),
+        gr.update(label=current_t["api_key"]),
+        gr.update(label=current_t["max_workers"]),
+        # 36–37. 按钮文字
+        gr.update(value=current_t["run_button"]),
+        gr.update(value=current_t["run_pipeline_button"]),
+    )
+
+# =========================
+# 其他已有回调与函数（保持不变）
 # =========================
 def switch_mode(m):
     if m == current_t["operators_mode"]:
@@ -252,16 +361,16 @@ def build_param_templates(op_name):
     info = dynamic_system.get_operator_info(op_name)
     if not info:
         return (
-            gr.update(value="未找到算子信息"),
+            gr.update(value="未找到算子信息" if current_t is zh_t else "Operator info not found"),
             gr.update(value=blank),
             gr.update(value=blank),
             gr.update(visible=False),
             gr.update(visible=False),
         )
     desc = info.description or ""
-    init_dict = {p.name: (p.default_value if p.has_default else "") 
+    init_dict = {p.name: (p.default_value if p.has_default else "")
                  for p in info.init_params if p.name != "llm_serving"}
-    run_dict  = {p.name: (p.default_value if p.has_default else "") 
+    run_dict  = {p.name: (p.default_value if p.has_default else "")
                  for p in info.run_params}
     init_str = json.dumps(init_dict, ensure_ascii=False, indent=2)
     run_str  = json.dumps(run_dict, ensure_ascii=False, indent=2)
@@ -279,7 +388,8 @@ def build_pipeline_info(name):
         return gr.update(value=current_t["desc_placeholder"])
     info = dynamic_system.get_pipeline_info(name)
     if not info:
-        return gr.update(value="Pipeline 未找到")
+        msg = "Pipeline 未找到" if current_t is zh_t else "Pipeline not found"
+        return gr.update(value=msg)
     return gr.update(value=info.description or name)
 
 def gradio_run(
@@ -326,7 +436,6 @@ def gradio_run_pipeline(
             return f"[Error] Pipeline '{pipeline_name}' not found", "<pre></pre>"
         pipeline_inst = info.class_obj()
 
-        # 重建 Storage
         pipeline_inst.storage = FileStorage(
             first_entry_file_name=pipeline_input_file or pipeline_inst.storage.first_entry_file_name,
             cache_path=cache_path,
@@ -334,11 +443,9 @@ def gradio_run_pipeline(
             cache_type="jsonl"
         )
 
-        # 写入 API Key 环境变量
         if api_key:
             os.environ["DF_API_KEY"] = api_key
 
-        # 构造并注入新的 API LLM 服务
         new_serving = dynamic_system.create_serving_instance(
             "API",
             api_url=api_url,
@@ -350,10 +457,8 @@ def gradio_run_pipeline(
             if hasattr(comp, "llm_serving"):
                 comp.llm_serving = new_serving
 
-        # 运行 Pipeline
         pipeline_inst.forward()
 
-        # 读取结果
         out_fn = pipeline_inst.storage._get_cache_file_path(pipeline_inst.storage.operator_step)
         if os.path.exists(out_fn):
             try:
@@ -373,85 +478,127 @@ def gradio_run_pipeline(
 # Gradio 界面
 # =========================
 with gr.Blocks(title="DataFlow 动态算子和Pipeline可视化") as demo:
-    header_md     = gr.Markdown(current_t["header"])
-    mode_switch   = gr.Radio(
+    # 0. 语言切换
+    lang_switch = gr.Radio(
+        choices=["中文", "English"],
+        value="中文",
+        label="Language / 语言"
+    )
+
+    # 1. 顶部标题
+    header_md = gr.Markdown(current_t["header"])
+
+    # 2. 模式切换
+    mode_switch = gr.Radio(
         choices=[current_t["operators_mode"], current_t["pipelines_mode"]],
         value=current_t["operators_mode"],
         label=current_t["mode_switch"]
     )
 
-    # 算子模式
+    # 算子模式区
     with gr.Column(visible=True) as operator_section:
         operator_dropdown = gr.Dropdown(
             choices=dynamic_system.get_operator_names(),
             label=current_t["select_operator"]
         )
-        operator_desc_md  = gr.Markdown(current_t["desc_placeholder"])
+        operator_desc_md = gr.Markdown(current_t["desc_placeholder"])
 
-    # Pipeline 模式
+    # Pipeline 模式区
     with gr.Column(visible=False) as pipeline_section:
         pipeline_dropdown = gr.Dropdown(
             choices=dynamic_system.get_pipeline_names_by_category("api"),
             label=current_t["select_pipeline"]
         )
-        pipeline_desc_md  = gr.Markdown(current_t["desc_placeholder"])
+        pipeline_desc_md = gr.Markdown(current_t["desc_placeholder"])
 
     # 参数与存储区
     with gr.Row():
         # 算子运行区
         with gr.Column(scale=1):
             with gr.Column(visible=True) as operator_run_section:
-                gr.Markdown(current_t["init_section"])
-                init_editor = gr.Code(label=current_t["other_init"], language="json", interactive=True, lines=6, value="{}")
+                init_section_md = gr.Markdown(current_t["init_section"])
+                init_editor = gr.Code(
+                    label=current_t["other_init"],
+                    language="json",
+                    interactive=True,
+                    lines=6,
+                    value="{}"
+                )
                 call_method = gr.Radio(
                     choices=[current_t["api_section"], current_t["local_section"]],
                     value=current_t["api_section"],
                     label=current_t["call_method"]
                 )
                 with gr.Column(visible=True) as api_group:
-                    gr.Markdown(current_t["api_section"])
-                    api_url     = gr.Textbox(label=current_t["api_url"])
-                    model_name  = gr.Textbox(label=current_t["model_name"])
-                    api_key     = gr.Textbox(label=current_t["api_key"], type="password")
+                    api_section_md = gr.Markdown(current_t["api_section"])
+                    api_url = gr.Textbox(label=current_t["api_url"])
+                    model_name = gr.Textbox(label=current_t["model_name"])
+                    api_key = gr.Textbox(label=current_t["api_key"], type="password")
                     max_workers = gr.Number(label=current_t["max_workers"], value=2)
                 with gr.Column(visible=False) as local_group:
-                    gr.Markdown(current_t["local_section"])
-                    local_model_path     = gr.Textbox(label=current_t["local_model_path"])
+                    local_section_md = gr.Markdown(current_t["local_section"])
+                    local_model_path = gr.Textbox(label=current_t["local_model_path"])
                     tensor_parallel_size = gr.Number(label=current_t["tensor_parallel_size"], value=1)
-                    temperature          = gr.Number(label=current_t["temperature"], value=0.7)
-                    top_p                = gr.Number(label=current_t["top_p"], value=0.9)
-                    max_tokens           = gr.Number(label=current_t["max_tokens"], value=1024)
+                    temperature = gr.Number(label=current_t["temperature"], value=0.7)
+                    top_p = gr.Number(label=current_t["top_p"], value=0.9)
+                    max_tokens = gr.Number(label=current_t["max_tokens"], value=1024)
 
         # Pipeline 运行区
         with gr.Column(visible=False) as pipeline_run_section:
-            gr.Markdown(current_t["api_pipeline_section"])
+            api_pipeline_section_md = gr.Markdown(current_t["api_pipeline_section"])
             pipeline_input_file = gr.Textbox(label=current_t["pipeline_input_file"], value="")
-            gr.Markdown(current_t["storage_section"])
-            pipeline_cache_path      = gr.Textbox(label=current_t["cache_path"], value="./cache")
-            pipeline_file_name_prefix= gr.Textbox(label=current_t["file_name_prefix"], value="result")
-            pipeline_api_url         = gr.Textbox(label=current_t["api_url"], value="https://api.openai.com/v1/chat/completions")
-            pipeline_api_model_name  = gr.Textbox(label=current_t["model_name"], value="gpt-4o-mini")
-            pipeline_api_key         = gr.Textbox(label=current_t["api_key"], type="password")
+            storage_section_md2 = gr.Markdown(current_t["storage_section"])
+            pipeline_cache_path = gr.Textbox(label=current_t["cache_path"], value="./cache")
+            pipeline_file_name_prefix = gr.Textbox(label=current_t["file_name_prefix"], value="result")
+            pipeline_api_url = gr.Textbox(label=current_t["api_url"], value="https://api.openai.com/v1/chat/completions")
+            pipeline_api_model_name = gr.Textbox(label=current_t["model_name"], value="gpt-4o-mini")
+            pipeline_api_key = gr.Textbox(label=current_t["api_key"], type="password")
             pipeline_api_max_workers = gr.Number(label=current_t["max_workers"], value=2)
 
         # 算子存储区
-        with gr.Column(scale=1):
-            with gr.Column(visible=True) as operator_storage_section:
-                gr.Markdown(current_t["storage_section"])
-                input_file_path  = gr.Textbox(label=current_t["input_file_path"], value="")
-                cache_path       = gr.Textbox(label=current_t["cache_path"], value="./cache")
-                file_name_prefix = gr.Textbox(label=current_t["file_name_prefix"], value="result")
-                gr.Markdown(current_t["run_section"])
-                run_editor = gr.Code(label=current_t["run_params"], language="json", interactive=True, lines=4, value="{}")
+        with gr.Column(scale=1) as operator_storage_section:
+            storage_section_md1 = gr.Markdown(current_t["storage_section"])
+            input_file_path = gr.Textbox(label=current_t["input_file_path"], value="")
+            cache_path = gr.Textbox(label=current_t["cache_path"], value="./cache")
+            file_name_prefix = gr.Textbox(label=current_t["file_name_prefix"], value="result")
+            run_section_md = gr.Markdown(current_t["run_section"])
+            run_editor = gr.Code(
+                label=current_t["run_params"],
+                language="json",
+                interactive=True,
+                lines=4,
+                value="{}"
+            )
 
+    # 按钮
     with gr.Row():
-        run_btn          = gr.Button(current_t["run_button"], variant="primary", visible=True)
-        run_pipeline_btn = gr.Button(current_t["run_pipeline_button"], variant="primary", visible=False)
+        run_btn = gr.Button(value=current_t["run_button"], variant="primary", visible=True)
+        run_pipeline_btn = gr.Button(value=current_t["run_pipeline_button"], variant="primary", visible=False)
 
+    # 输出区
     summary_md   = gr.Markdown()
     preview_html = gr.HTML()
 
     # 事件绑定
+    lang_switch.change(
+        fn=switch_language,
+        inputs=[lang_switch],
+        outputs=[
+            header_md, mode_switch,
+            operator_dropdown, pipeline_dropdown,
+            operator_desc_md, pipeline_desc_md,
+            init_section_md, init_editor, call_method,
+            api_section_md, api_url, model_name, api_key, max_workers,
+            local_section_md, local_model_path, tensor_parallel_size, temperature, top_p, max_tokens,
+            storage_section_md1, input_file_path, cache_path, file_name_prefix,
+            run_section_md, run_editor,
+            api_pipeline_section_md, pipeline_input_file,
+            storage_section_md2, pipeline_cache_path, pipeline_file_name_prefix,
+            pipeline_api_url, pipeline_api_model_name, pipeline_api_key, pipeline_api_max_workers,
+            run_btn, run_pipeline_btn
+        ]
+    )
+
     mode_switch.change(
         fn=switch_mode,
         inputs=[mode_switch],
@@ -479,8 +626,10 @@ with gr.Blocks(title="DataFlow 动态算子和Pipeline可视化") as demo:
     )
 
     call_method.change(
-        fn=lambda m: (gr.update(visible=(m==current_t["api_section"])),
-                      gr.update(visible=(m!=current_t["api_section"]))),
+        fn=lambda m: (
+            gr.update(visible=(m==current_t["api_section"])),
+            gr.update(visible=(m!=current_t["api_section"]))
+        ),
         inputs=[call_method],
         outputs=[api_group, local_group]
     )
