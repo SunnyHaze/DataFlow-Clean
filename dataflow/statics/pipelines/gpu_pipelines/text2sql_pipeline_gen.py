@@ -79,7 +79,7 @@ class Text2SQLGeneration_GPUPipeline():
         db_root_path = ""  
 
         # SQL execution timeout. Generated SQL execution time should be less than this value.
-        sql_execution_timeout = 3
+        sql_execution_timeout = 2
 
         # SQLite and MySQL are currently supported
         # db_type can be sqlite or mysql, which must match your database type
@@ -109,7 +109,7 @@ class Text2SQLGeneration_GPUPipeline():
         self.sql_generator_step1 = SQLGenerator(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            generate_num=300
+            generate_num=10
         )
 
         self.sql_execution_filter_step2 = SQLExecutionFilter(

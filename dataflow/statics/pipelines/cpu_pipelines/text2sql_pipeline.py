@@ -45,7 +45,7 @@ class Text2SQL_CPUPipeline():
         db_root_path = ""
 
         # SQL execution timeout. Generated SQL execution time should be less than this value.
-        sql_execution_timeout = 3
+        sql_execution_timeout = 2
 
         # SQLite and MySQL are currently supported
         # db_type can be sqlite or mysql, which must match your database type

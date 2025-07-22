@@ -16,7 +16,7 @@ from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
-class Text2SQLGeneration_APIPipeline():
+class Text2SQLPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -202,6 +202,6 @@ class Text2SQLGeneration_APIPipeline():
         )
 
 if __name__ == "__main__":
-    model = Text2SQLGeneration_APIPipeline()
+    model = Text2SQLPipeline()
     model.forward()
 
