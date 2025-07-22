@@ -17,7 +17,7 @@ class GeneralReasoningPipeline():
     def __init__(self, llm_serving: LLMServingABC = None):
         
         self.storage = FileStorage(
-            first_entry_file_name="../dataflow/example/ReasoningPipeline/pipeline_general_short.json",
+            first_entry_file_name="../dataflow/example/ReasoningPipeline/pipeline_general.json",
             cache_path="./cache_local",
             file_name_prefix="dataflow_cache_step",
             cache_type="jsonl",
