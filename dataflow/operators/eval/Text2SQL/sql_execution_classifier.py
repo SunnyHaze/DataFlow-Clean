@@ -165,7 +165,7 @@ class SQLExecutionClassifier(OperatorABC):
         
         def process_batch(batch_data):
             batch_predicted_sqls, batch_ground_truth, batch_db_ids, batch_idxs = batch_data
-            return ExecutionClassifier.execute_model_batch(
+            return SQLExecutionClassifier.execute_model_batch(
                 batch_predicted_sqls, batch_ground_truth, database_manager, 
                 batch_db_ids, batch_idxs, self.timeout, self.logger
             )
