@@ -18,7 +18,7 @@
 [简体中文](./README-zh.md) | English
 
 
-**[🚀 Features](#3-pipelines-functionality) • [⚡ Quick Start](#4-quick-start) • [📖 Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 Experiments](#5-experimental-results)**
+**[🚀 Features](#-3-pipelines-functionality) • [⚡ Quick Start](#-4-quick-start) • [📖 Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 Experiments](#-5-experimental-results)**
 
 </div>
 
