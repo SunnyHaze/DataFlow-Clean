@@ -7,6 +7,7 @@ from dataflow.core import OperatorABC
 import os
 from pathlib import Path
 from trafilatura import fetch_url, extract
+import requests
 
 def _parse_file_with_mineru(raw_file: str, output_file: str, mineru_backend: Literal["vlm-sglang-engine", "pipeline"] = "vlm-sglang-engine") -> str:
     """
@@ -113,6 +114,37 @@ def _parse_xml_to_md(raw_file:str=None, url:str=None, output_file:str=None):
 
     return output_file
 
+def is_pdf_url(url):
+    try:
+        # 发送HEAD请求，只获取响应头，不下载文件
+        response = requests.head(url, allow_redirects=True)
+        # 如果响应的Content-Type是application/pdf
+        if response.headers.get('Content-Type') == 'application/pdf':
+            return True
+        else:
+            print(f"Content-Type: {response.headers.get('Content-Type')}")
+            return False
+    except requests.exceptions.RequestException:
+        # 如果请求失败，返回False
+        return False
+
+def download_pdf(url, save_path):
+    try:
+        # 发送GET请求下载PDF文件
+        response = requests.get(url, stream=True)
+        # 确保响应内容是PDF
+        if response.status_code == 200 and response.headers.get('Content-Type') == 'application/pdf':
+            # 将PDF保存到本地
+            with open(save_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+            print(f"PDF saved to {save_path}")
+        else:
+            print("The URL did not return a valid PDF file.")
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading PDF: {e}")
+    
 @OPERATOR_REGISTRY.register()
 class FileOrURLToMarkdownConverter(OperatorABC):
     """
@@ -172,13 +204,23 @@ class FileOrURLToMarkdownConverter(OperatorABC):
 
         # Handle extraction from URL
         if url:
-            output_file = os.path.join(
-                os.path.dirname(storage.first_entry_file_name),
-                "raw/crawled.md"
-            )
-            output_file = _parse_xml_to_md(url=url, output_file=output_file)
-            self.logger.info(f"Primary extracted result written to: {output_file}")
-            return output_file
+            if is_pdf_url(url):
+                pdf_save_path = output_file = os.path.join(
+                    os.path.dirname(storage.first_entry_file_name),
+                    "raw/crawled.pdf"
+                )
+                self.logger.info(f"Downloading PDF from {url} to {pdf_save_path}")
+                download_pdf(url, pdf_save_path)
+                raw_file=pdf_save_path
+                self.logger.info(f"pdf file has been fetched and saved to {pdf_save_path}")
+            else:       
+                output_file = os.path.join(
+                    os.path.dirname(storage.first_entry_file_name),
+                    "raw/crawled.md"
+                )
+                output_file = _parse_xml_to_md(url=url, output_file=output_file)
+                self.logger.info(f"Primary extracted result written to: {output_file}")
+                return output_file
 
 
 
