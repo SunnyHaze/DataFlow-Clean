@@ -9,7 +9,8 @@ from dataflow.core import LLMServingABC
 from dataflow.prompts.reasoning.general import (
     GeneralQuestionFilterPrompt,
     GeneralAnswerGeneratorPrompt,
-    GeneralQuestionSynthesisPrompt
+    GeneralQuestionSynthesisPrompt,
+    AnswerJudgePrompt,
 )
 
 class GeneralReasoningPipeline():
@@ -45,8 +46,11 @@ class GeneralReasoningPipeline():
             llm_serving=llm_serving,
             prompt_template=GeneralAnswerGeneratorPrompt()
         )
-        
-        self.answer_ngram_filter_step4 = AnswerNgramFilter(
+        self.answer_model_judge_step4 = AnswerModelJudge(
+            llm_serving=llm_serving,
+            prompt_template=AnswerJudgePrompt()
+        )
+        self.answer_ngram_filter_step5 = AnswerNgramFilter(
             min_score = 0.1,
             max_score = 1.0,
             ngrams = 5
@@ -66,8 +70,14 @@ class GeneralReasoningPipeline():
             storage = self.storage.step(),
             input_key = "instruction", 
             output_key = "generated_cot"
-        )
-        self.answer_ngram_filter_step4.run(
+        ),
+        self.answer_model_judge_step4.run(
+            storage = self.storage.step(),
+            question_key = "instruction",
+            answer_key = "generated_cot",
+            reference_key = "golden_answer"
+        ),
+        self.answer_ngram_filter_step5.run(
             storage = self.storage.step(),
             question_key = "instruction",
             answer_key = "generated_cot"

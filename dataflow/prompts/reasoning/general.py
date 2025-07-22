@@ -102,3 +102,30 @@ class GeneralQuestionFilterPrompt:
         """
         return prompt
 
+class AnswerJudgePrompt:
+    """
+    用于构建答案评判的提示词模板
+    """
+    def __init__(self):
+        pass
+    
+    def build_prompt(self, question, answer, reference_answer):
+        prompt = f"""
+        请你作为一个答案评判专家，评估以下答案是否正确。
+        
+        问题：{question}
+        
+        参考答案：{reference_answer}
+        
+        当前答案：{answer}
+        
+        请仔细分析当前答案与参考答案的语义是否一致。不要只看表面文字，要理解答案的实质内容。
+        如果当前答案在语义上与参考答案一致，即使表述方式不同，也应判定为正确。
+        
+        请以JSON格式返回你的判断结果：
+        {{"judgement_result": true}} 表示答案正确
+        {{"judgement_result": false}} 表示答案错误
+        
+        请给出你的判断：
+        """
+        return prompt
