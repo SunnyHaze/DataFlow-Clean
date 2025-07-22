@@ -35,7 +35,7 @@ from dataflow.operators.generate import SFTGeneratorSeed
 from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 from dataflow.utils.storage import FileStorage
 
-class SFTTextSynPipeline():
+class SFTTextSynthetic_GPUPipeline():
     def __init__(self):
         self.storage = FileStorage(
             first_entry_file_name="../example_data/GeneralTextPipeline/pt_input.jsonl",
@@ -236,5 +236,5 @@ class SFTTextSynPipeline():
 if __name__ == "__main__":
     # This is the entry point for the pipeline
 
-    model = SFTTextSynPipeline()
+    model = SFTTextSynthetic_GPUPipeline()
     model.forward()

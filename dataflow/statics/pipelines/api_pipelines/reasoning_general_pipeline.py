@@ -13,7 +13,7 @@ from dataflow.prompts.reasoning.general import (
     AnswerJudgePrompt,
 )
 
-class GeneralReasoningPipeline():
+class GeneralReasoning_APIPipeline():
     def __init__(self, llm_serving: LLMServingABC = None):
         
         self.storage = FileStorage(
@@ -85,5 +85,5 @@ class GeneralReasoningPipeline():
         )
 
 if __name__ == "__main__":
-    pl = GeneralReasoningPipeline()
+    pl = GeneralReasoning_APIPipeline()
     pl.forward()

@@ -13,7 +13,7 @@ from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 
 # 这里或许未来可以有个pipeline基类
-class ReasoningPipeline_Pretrain():
+class Reasoning_APIPipeline_Pretrain():
     def __init__(self, llm_serving=None):
 
         self.storage = FileStorage(
@@ -104,6 +104,6 @@ class ReasoningPipeline_Pretrain():
             )
 
 if __name__ == "__main__":
-    pipeline = ReasoningPipeline_Pretrain()
+    pipeline = Reasoning_APIPipeline_Pretrain()
     pipeline.forward()
 

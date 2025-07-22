@@ -7,7 +7,7 @@ from dataflow.operators.generate import (
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request
 
-class KBCleaningPipeline():
+class KBCleaningPDF_APIPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -70,5 +70,5 @@ class KBCleaningPipeline():
         )
         
 if __name__ == "__main__":
-    model = KBCleaningPipeline()
+    model = KBCleaningPDF_APIPipeline()
     model.forward(raw_file="../example_data/KBCleaningPipeline/test.pdf")

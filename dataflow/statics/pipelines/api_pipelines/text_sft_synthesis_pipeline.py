@@ -5,7 +5,7 @@ from dataflow.operators.refine import CondorRefiner
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request
 
-class TextPipeline():
+class TextSFTSynthesis_APIPipeline():
     def __init__(self):
         self.storage = FileStorage(
             first_entry_file_name="",
@@ -40,5 +40,6 @@ class TextPipeline():
             input_output_key='output'
         )
 
-model = TextPipeline()
-model.forward()
+if __name__ == "__main__":
+    model = TextSFTSynthesis_APIPipeline()
+    model.forward()

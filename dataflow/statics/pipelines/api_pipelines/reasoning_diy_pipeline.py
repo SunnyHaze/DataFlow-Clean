@@ -42,7 +42,7 @@ DIY_PROMPT_SYNTHESIS = """
     
 DIY_PROMPT_ANSWER = """Please firstly output a symbol "Yeah, It is the answer:", and then output the answer."""
 
-class DiyReasoningPipeline():
+class DiyReasoning_APIPipeline():
     def __init__(self, llm_serving: LLMServingABC = None):
         
         self.storage = FileStorage(
@@ -104,5 +104,5 @@ class DiyReasoningPipeline():
         )
 
 if __name__ == "__main__":
-    pl = DiyReasoningPipeline()
+    pl = DiyReasoning_APIPipeline()
     pl.forward()

@@ -7,7 +7,7 @@ from dataflow.operators.generate import (
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request
 
-class KBCleaningPipeline():
+class KBCleaningURL_APIPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -71,6 +71,6 @@ class KBCleaningPipeline():
         )
 
 if __name__ == "__main__":
-    model = KBCleaningPipeline()
+    model = KBCleaningURL_APIPipeline()
     model.forward(url="https://trafilatura.readthedocs.io/en/latest/quickstart.html")
 

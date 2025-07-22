@@ -11,7 +11,7 @@ from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 from dataflow.core import LLMServingABC
 
-class AgenticRAGEvalPipeline():
+class AgenticRAGEval_APIPipeline():
 
     def __init__(self, llm_serving=None):
 
@@ -49,5 +49,5 @@ class AgenticRAGEvalPipeline():
         )
 
 if __name__ == "__main__":
-    model = AgenticRAGEvalPipeline()
+    model = AgenticRAGEval_APIPipeline()
     model.forward()

@@ -2,7 +2,7 @@ from dataflow.operators.conversations import ConsistentChatGenerator
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request 
 
-class TextPipeline():
+class TextConversationSynthesis_APIPipeline():
     def __init__(self):
         self.storage = FileStorage(
             first_entry_file_name="",
@@ -28,5 +28,5 @@ if __name__ == "__main__":
     # It will run the forward method of the TextPipeline class
     # to process the data and generate the output.
     print("Running TextPipeline...")
-    model = TextPipeline()
+    model = TextConversationSynthesis_APIPipeline()
     model.forward()

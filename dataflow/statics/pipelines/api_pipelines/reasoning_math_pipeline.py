@@ -24,7 +24,7 @@ from dataflow.serving import APILLMServing_request, LocalModelLLMServing
 from dataflow.core import LLMServingABC
 
 # 这里或许未来可以有个pipeline基类
-class ReasoningPipeline():
+class ReasoningMath_APIPipeline():
     def __init__(self, llm_serving: LLMServingABC = None):
 
         self.storage = FileStorage(
@@ -156,5 +156,5 @@ class ReasoningPipeline():
         )
 
 if __name__ == "__main__":
-    model = ReasoningPipeline()
+    model = ReasoningMath_APIPipeline()
     model.forward()

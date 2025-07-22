@@ -6,7 +6,7 @@ from dataflow.operators.generate import (
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 
-class RAREPipeline():
+class RARE_GPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -17,7 +17,7 @@ class RAREPipeline():
         )
 
         # use vllm as LLM serving
-        llm_serving = LocalModelLLMServing_vllm(
+        self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="LLama3.1-70B-Instruct", # set to your own model path
             vllm_tensor_parallel_size=1,
             vllm_max_tokens=1024*8,
@@ -33,11 +33,11 @@ class RAREPipeline():
         # )
 
 
-        self.doc2query_step1 = Doc2Query(llm_serving)
+        self.doc2query_step1 = Doc2Query(self.llm_serving)
 
         self.bm25hardneg_step2 = BM25HardNeg()
 
-        self.reasondistill_step3 = ReasonDistill(llm_serving)
+        self.reasondistill_step3 = ReasonDistill(self.llm_serving)
         
     def forward(self):
         
@@ -63,5 +63,5 @@ class RAREPipeline():
         )
         
 if __name__ == "__main__":
-    model = RAREPipeline()
+    model = RARE_GPUPipeline()
     model.forward()

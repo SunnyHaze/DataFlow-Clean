@@ -6,7 +6,7 @@ from dataflow.operators.generate import (
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request
 
-class RAREPipeline():
+class RARE_APIPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -53,5 +53,5 @@ class RAREPipeline():
         )
         
 if __name__ == "__main__":
-    model = RAREPipeline()
+    model = RARE_APIPipeline()
     model.forward()
