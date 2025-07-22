@@ -17,7 +17,7 @@ class KBCleaningPDF_APIPipeline():
             cache_type="json",
         )
 
-        api_llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
                 api_url="https://api.openai.com/v1/chat/completions",
                 model_name="gpt-4o",
                 max_workers=100
@@ -36,12 +36,12 @@ class KBCleaningPDF_APIPipeline():
         )
 
         self.knowledge_cleaning_step3 = KnowledgeCleaner(
-            llm_serving=api_llm_serving,
+            llm_serving=self.llm_serving,
             lang="en"
         )
 
         self.knowledge_cleaning_step4 = MultiHopQAGenerator(
-            llm_serving=api_llm_serving,
+            llm_serving=self.llm_serving,
             lang="en"
         )
 

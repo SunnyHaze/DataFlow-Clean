@@ -22,14 +22,14 @@ class AgenticRAGEval_APIPipeline():
             cache_type="jsonl",
         )
 
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
             api_url="https://api.openai.com/v1/chat/completions",
             model_name="gpt-4o-mini",
             max_workers=500
         )
 
         self.task_step1 = AtomicTaskGenerator(
-            llm_serving=llm_serving
+            llm_serving=self.llm_serving
         )
 
         self.task_step2 = F1Scorer()

@@ -17,17 +17,17 @@ class RARE_APIPipeline():
         )
 
         # use API server as LLM serving
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
                 api_url="https://api.openai.com/v1/chat/completions",
                 model_name="gpt-4o",
                 max_workers=1
         )
 
-        self.doc2query_step1 = Doc2Query(llm_serving)
+        self.doc2query_step1 = Doc2Query(self.llm_serving)
 
         self.bm25hardneg_step2 = BM25HardNeg()
 
-        self.reasondistill_step3 = ReasonDistill(llm_serving)
+        self.reasondistill_step3 = ReasonDistill(self.llm_serving)
         
     def forward(self):
 

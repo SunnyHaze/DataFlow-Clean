@@ -35,7 +35,7 @@ class ReasoningMath_APIPipeline():
         )
 
         # use API server as LLM serving
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
                 api_url="http://api.openai.com/v1/chat/completions",
                 model_name="gpt-4o",
                 max_workers=100
@@ -53,12 +53,12 @@ class ReasoningMath_APIPipeline():
 
         self.question_filter_step1 = QuestionFilter(
             system_prompt="You are an expert in evaluating mathematical problems. Follow the user's instructions strictly and output your final judgment in the required JSON format.",
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionFilterPrompt()
         )
         self.question_gen_step2 =  QuestionGenerator(
             num_prompts=3,
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             prompt_template=MathQuestionSynthesisPrompt()
         )
         self.question_filter_step3 = QuestionFilter(

@@ -23,7 +23,7 @@ class AgenticRAG_APIPipeline():
         )
 
         # use API server as LLM serving
-        llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
                 api_url="https://api.openai.com/v1/chat/completions",
                 model_name="gpt-4o",
                 max_workers=1
@@ -37,11 +37,11 @@ class AgenticRAG_APIPipeline():
 
         self.content_chooser_step1 = ContentChooser(embedding_serving=embedding_serving, num_samples=5, method="random")
 
-        self.prompt_generator_step2 = AutoPromptGenerator(llm_serving)
+        self.prompt_generator_step2 = AutoPromptGenerator(self.llm_serving)
 
-        self.qa_generator_step3 = QAGenerator(llm_serving)
+        self.qa_generator_step3 = QAGenerator(self.llm_serving)
 
-        self.qa_scorer_step4 = QAScorer(llm_serving)
+        self.qa_scorer_step4 = QAScorer(self.llm_serving)
         
     def forward(self):
 
