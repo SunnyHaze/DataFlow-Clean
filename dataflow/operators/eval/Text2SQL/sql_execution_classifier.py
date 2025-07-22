@@ -13,8 +13,13 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
 @OPERATOR_REGISTRY.register()
-class ExecutionClassifier(OperatorABC):
-    def __init__(self, llm_serving: LLMServingABC, database_manager: DatabaseManager, difficulty_config: dict | None = None, num_generations: int = 10):
+class SQLExecutionClassifier(OperatorABC):
+    def __init__(self, 
+                llm_serving: LLMServingABC, 
+                database_manager: DatabaseManager, 
+                difficulty_config: dict | None = None, 
+                num_generations: int = 10,
+                timeout: float = 5.0):
         self.llm_serving = llm_serving     
         self.database_manager = database_manager
         if difficulty_config is None:
@@ -25,6 +30,7 @@ class ExecutionClassifier(OperatorABC):
         else:
             self.difficulty_config = difficulty_config
         self.num_generations = num_generations
+        self.timeout = timeout
         self.logger = get_logger()
         if len(self.difficulty_config['thresholds']) != len(self.difficulty_config['labels']) - 1:
             raise ValueError("Thresholds and labels configuration mismatch")
@@ -74,10 +80,8 @@ class ExecutionClassifier(OperatorABC):
 
     @staticmethod
     def execute_model_batch(predicted_sqls_list, ground_truth_list, database_manager, db_ids, idxs, meta_time_out, logger):
-        """批量执行模型，使用batch_compare_sql"""
-        # 准备批量比较的数据
         comparisons = []
-        sql_mapping = {}  # 用于映射批量结果回原始数据结构
+        sql_mapping = {}
         
         comparison_idx = 0
         for i, (predicted_sqls, ground_truth, db_id, idx) in enumerate(zip(predicted_sqls_list, ground_truth_list, db_ids, idxs)):
@@ -90,7 +94,6 @@ class ExecutionClassifier(OperatorABC):
                     'operation_id': f"compare_{comparison_idx}"
                 }
                 comparisons.append(comparison)
-                # 记录映射关系
                 sql_mapping[comparison_idx] = {
                     'original_idx': i,
                     'sql_idx': j,
@@ -99,12 +102,10 @@ class ExecutionClassifier(OperatorABC):
                 }
                 comparison_idx += 1
         
-        # 批量执行比较
         try:
             batch_results = database_manager.batch_compare_sql(comparisons)
         except Exception as e:
             logger.error(f"Batch comparison failed: {e}")
-            # 如果批量失败，返回错误结果
             results = []
             for i, (predicted_sqls, _, _, idx) in enumerate(zip(predicted_sqls_list, ground_truth_list, db_ids, idxs)):
                 result_data = []
@@ -113,7 +114,6 @@ class ExecutionClassifier(OperatorABC):
                 results.append({"idx": idx, "cnt_true": -1, "results": result_data})
             return results
         
-        # 处理批量结果，重新组织为原始格式
         results = {}
         for i, (predicted_sqls, _, _, idx) in enumerate(zip(predicted_sqls_list, ground_truth_list, db_ids, idxs)):
             results[i] = {
@@ -122,7 +122,6 @@ class ExecutionClassifier(OperatorABC):
                 "results": [None] * len(predicted_sqls)
             }
         
-        # 将批量结果映射回原始结构
         for batch_idx, batch_result in enumerate(batch_results):
             if batch_idx in sql_mapping:
                 mapping = sql_mapping[batch_idx]
@@ -139,14 +138,12 @@ class ExecutionClassifier(OperatorABC):
                 
                 results[original_idx]["results"][sql_idx] = result_item
         
-        # 转换为列表格式
         return [results[i] for i in sorted(results.keys())]
 
     def run_sqls_parallel(self, datas, database_manager, num_cpus, meta_time_out):
-        pbar = tqdm(total=len(datas), desc="Executing SQLs")
+        # pbar = tqdm(total=len(datas), desc="Executing SQLs")
         exec_result = []
 
-        # 准备批量数据
         predicted_sqls_list = []
         ground_truth_list = []
         db_ids = []
@@ -163,17 +160,16 @@ class ExecutionClassifier(OperatorABC):
             db_ids.append(db_id)
             idxs.append(i)
         
-        # 计算批次大小（基于CPU数量）
-        batch_size = max(1, len(datas) // num_cpus) if num_cpus > 1 else len(datas)
+        # batch_size = max(1, len(datas) // num_cpus) if num_cpus > 1 else len(datas)
+        batch_size = len(datas)
         
         def process_batch(batch_data):
             batch_predicted_sqls, batch_ground_truth, batch_db_ids, batch_idxs = batch_data
             return ExecutionClassifier.execute_model_batch(
                 batch_predicted_sqls, batch_ground_truth, database_manager, 
-                batch_db_ids, batch_idxs, meta_time_out, self.logger
+                batch_db_ids, batch_idxs, self.timeout, self.logger
             )
         
-        # 分批处理
         batches = []
         for i in range(0, len(datas), batch_size):
             end_idx = min(i + batch_size, len(datas))
@@ -192,13 +188,12 @@ class ExecutionClassifier(OperatorABC):
                 try:
                     batch_results = future.result()
                     exec_result.extend(batch_results)
-                    pbar.update(len(batch_results))
+                    # pbar.update(len(batch_results))
                 except Exception as e:
-                    self.logger.error(f"Error in batch SQL execution: {e}")
-                    # 为失败的批次添加错误结果
-                    pbar.update(batch_size)
+                    self.logger.warning(f"Error in batch SQL execution: {e}")
+                    # pbar.update(batch_size)
 
-        pbar.close()
+        # pbar.close()
         return exec_result
 
     def sort_results(self, list_of_dicts):

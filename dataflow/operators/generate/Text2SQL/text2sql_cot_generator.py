@@ -11,7 +11,7 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
 @OPERATOR_REGISTRY.register()
-class CoTGenerator(OperatorABC):
+class Text2SQLCoTGenerator(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC, 
                 database_manager: DatabaseManager,
                 schema_config: Optional[Dict] = None,
@@ -135,7 +135,6 @@ class CoTGenerator(OperatorABC):
                 
             self.logger.info(f"Start {retry_round + 1} round processing, {len(failed_items)} items to process")
             
-            # 生成所有的 prompts
             prompts = []
             for item in failed_items:
                 db_id = item.get(self.input_db_id_key)
@@ -145,10 +144,8 @@ class CoTGenerator(OperatorABC):
                 cot_prompt = self.generate_cot_synthesis_prompts(formatted_schema, question, sql)
                 prompts.append(cot_prompt)
             
-            # 批量生成 CoT responses
             cot_responses = self.llm_serving.generate_from_input(prompts, "")
             
-            # 准备批量 SQL 比较
             comparisons = []
             valid_items_with_responses = []
             
@@ -167,37 +164,31 @@ class CoTGenerator(OperatorABC):
                     })
                     valid_items_with_responses.append((item, response, generated_sql))
             
-            # 批量执行 SQL 比较
             if comparisons:
                 try:
                     batch_results = self.database_manager.batch_compare_sql(comparisons)
                     
-                    # 处理批量比较结果
                     current_round_failed = []
                     for (item, response, generated_sql), batch_result in zip(valid_items_with_responses, batch_results):
                         db_id = item.get(self.input_db_id_key)
                         
                         if batch_result.success and batch_result.data:
-                            # SQL 比较成功且结果为 True
                             results.append({
                                 **item,
                                 self.output_cot_key: response
                             })
                             self.logger.debug(f"Successfully processed {db_id} (Round {retry_round + 1})")
                         else:
-                            # SQL 比较失败或结果为 False
                             current_round_failed.append(item)
                             if batch_result.error:
                                 self.logger.debug(f"SQL comparison failed for {db_id}: {batch_result.error}")
                     
-                    # 添加那些无法提取 SQL 的项目到失败列表
                     for item, response in zip(failed_items, cot_responses):
                         if item not in [valid_item for valid_item, _, _ in valid_items_with_responses]:
                             current_round_failed.append(item)
                             
                 except Exception as e:
                     self.logger.error(f"Batch SQL comparison failed: {e}")
-                    # 如果批量比较失败，回退到原来的逐个处理方式
                     current_round_failed = []
                     for item, response in zip(failed_items, cot_responses):
                         db_id = item.get(self.input_db_id_key)
@@ -213,7 +204,6 @@ class CoTGenerator(OperatorABC):
                         else:
                             current_round_failed.append(item)
             else:
-                # 如果没有有效的 SQL 可以比较，所有项目都失败
                 current_round_failed = failed_items
             
             failed_items = current_round_failed

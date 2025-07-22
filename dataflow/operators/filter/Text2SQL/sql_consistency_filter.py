@@ -11,7 +11,7 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
 @OPERATOR_REGISTRY.register()
-class ConsistencyFilter(OperatorABC):
+class SQLConsistencyFilter(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC, database_manager: DatabaseManager):
         self.llm_serving = llm_serving     
         self.prompt = TextSQLConsistencyPrompt()

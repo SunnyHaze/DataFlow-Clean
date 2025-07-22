@@ -3,7 +3,6 @@ from typing import Dict, List, Optional, Any, Tuple
 import sqlite3
 import pymysql
 import threading
-import logging
 import copy
 import os
 import glob
@@ -569,7 +568,7 @@ class ConnectionPool:
         self._connection_times = {}
         self._closed = False
         
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger()
         
         self.is_sqlite = isinstance(connector, SQLiteConnector)
         if self.is_sqlite:
@@ -644,7 +643,7 @@ class ConnectionPool:
                 yield conn
                 
         except Exception as e:
-            self.logger.error(f"Connection error for thread {thread_id}: {e}")
+            self.logger.warning(f"Connection error for thread {thread_id}: {e}")
             if conn:
                 if self.is_sqlite:
                     with self._sqlite_lock:
@@ -839,7 +838,7 @@ class BatchOperationExecutor:
                         elapsed = time.time() - start_time
                         # self.logger.info(f"Completed batch for database, got {len(results)} results. Total elapsed: {elapsed:.2f}s")
                     except Exception as e:
-                        self.logger.error(f"Error in batch operation: {e}")
+                        # self.logger.warning(f"Error in batch operation: {e}")
                         operations = future_to_operations[future]
                         for op in operations:
                             all_results.append(BatchResult(
@@ -854,7 +853,7 @@ class BatchOperationExecutor:
                                 
             except concurrent.futures.TimeoutError:
                 elapsed = time.time() - start_time
-                self.logger.warning(f"Batch operation timeout after {timeout}s (actual: {elapsed:.2f}s)")
+                # self.logger.warning(f"Batch operation timeout after {timeout}s (actual: {elapsed:.2f}s)")
             
             unfinished_futures = set(future_to_operations.keys()) - completed_futures
             for future in unfinished_futures:
@@ -872,7 +871,7 @@ class BatchOperationExecutor:
                         self._progress_bar.update(len(operations))
             
             success_count = sum(1 for r in all_results if r.success)
-            self.logger.info(f"Batch execution completed: {success_count}/{len(all_results)} operations succeeded")
+            # self.logger.info(f"Batch execution completed: {success_count}/{len(all_results)} operations succeeded")
             
             return all_results
             
@@ -899,7 +898,7 @@ class BatchOperationExecutor:
             
             with pool.get_connection() as conn:
                 connection_time = time.time() - connection_start
-                self.logger.info(f"Got connection for {db_id} in {connection_time:.2f}s, executing {len(operations)} operations with timeout {unified_timeout}s")
+                # self.logger.info(f"Got connection for {db_id} in {connection_time:.2f}s, executing {len(operations)} operations with timeout {unified_timeout}s")
                 
                 if hasattr(connector, 'set_query_timeout'):
                     try:
@@ -924,8 +923,8 @@ class BatchOperationExecutor:
                         result.execution_time = time.time() - start_time
                         results.append(result)
                         
-                        if result.execution_time > unified_timeout * 0.8:
-                            self.logger.warning(f"Slow operation {op.operation_id} took {result.execution_time:.2f}s (timeout: {unified_timeout}s)")
+                        # if result.execution_time > unified_timeout * 0.8:
+                        #     self.logger.warning(f"Slow operation {op.operation_id} took {result.execution_time:.2f}s (timeout: {unified_timeout}s)")
                             
                     except Exception as e:
                         execution_time = time.time() - start_time
@@ -934,7 +933,7 @@ class BatchOperationExecutor:
                         if 'timeout' in error_msg.lower() or 'exceeded' in error_msg.lower():
                             error_msg = f"SQL execution timeout after {unified_timeout}s: {error_msg}"
                         
-                        self.logger.error(f"Exception in operation {op.operation_id}: {error_msg}")
+                        # self.logger.warning(f"Exception in operation {op.operation_id}: {error_msg}")
                         results.append(BatchResult(
                             operation_id=op.operation_id or f"{op.operation_type.value}_{hash(op.sql)}",
                             success=False,
@@ -946,12 +945,12 @@ class BatchOperationExecutor:
             timeout_count = sum(1 for r in results if not r.success and 'timeout' in r.error.lower())
             total_time = time.time() - connection_start
             
-            self.logger.info(f"Database {db_id} completed: {success_count}/{len(results)} operations succeeded, {timeout_count} timeouts, in {total_time:.2f}s")
+            # self.logger.info(f"Database {db_id} completed: {success_count}/{len(results)} operations succeeded, {timeout_count} timeouts, in {total_time:.2f}s")
             
             return results
             
         except Exception as e:
-            self.logger.error(f"Error in _execute_db_operations for {db_id}: {e}")
+            # self.logger.warning(f"Error in _execute_db_operations for {db_id}: {e}")
             results = []
             for op in operations:
                 results.append(BatchResult(
@@ -1160,7 +1159,7 @@ class DatabaseManager:
                  logger=None, max_connections_per_db=3, max_workers=8):
         self.db_type = db_type.lower()
         self.config = config or {}
-        self.logger = logger if logger else self._get_default_logger()
+        self.logger = get_logger()
         self.max_connections_per_db = max_connections_per_db
         self.max_workers = max_workers
         
@@ -1201,19 +1200,9 @@ class DatabaseManager:
             self._initialized = True
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize DatabaseManager: {e}")
+            self.logger.warning(f"Failed to initialize DatabaseManager: {e}")
             self.close()
             raise
-
-    def _get_default_logger(self):
-        logger = logging.getLogger(__name__)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-            logger.setLevel(logging.INFO)
-        return logger
 
     def _start_cleanup_timer(self):
         with self._cleanup_lock:
@@ -1244,7 +1233,7 @@ class DatabaseManager:
                     self._cleanup_timer.start()
                     
         except Exception as e:
-            self.logger.error(f"Error in periodic cleanup: {e}")
+            self.logger.warning(f"Error in periodic cleanup: {e}")
 
     def _get_connection_pool(self, db_id: str) -> ConnectionPool:
         if not self._initialized:
@@ -1407,7 +1396,7 @@ class DatabaseManager:
                 }
                 
         except Exception as e:
-            self.logger.error(f"Query execution failed for {db_id}: {e}")
+            self.logger.warning(f"Query execution failed for {db_id}: {e}")
             return {
                 'success': False,
                 'error': str(e),
@@ -1475,7 +1464,7 @@ class DatabaseManager:
                             })
                             
                     except Exception as table_error:
-                        self.logger.error(f"Error processing table {table_name}: {table_error}")
+                        self.logger.warning(f"Error processing table {table_name}: {table_error}")
                         continue
             
             if use_cache and schema['tables']:
@@ -1485,7 +1474,7 @@ class DatabaseManager:
             return schema
                 
         except Exception as e:
-            self.logger.error(f"Failed to get schema for {db_id}: {e}")
+            self.logger.warning(f"Failed to get schema for {db_id}: {e}")
             return {
                 'tables': {},
                 'foreign_keys': [],
@@ -1612,7 +1601,7 @@ class DatabaseManager:
             self.cache.set_query_result(db_id, cache_key, {'data': result})
             
         except Exception as e:
-            self.logger.error(f"Error getting insert statements for {db_id}: {e}")
+            self.logger.warning(f"Error getting insert statements for {db_id}: {e}")
         
         return result
     
@@ -1879,7 +1868,7 @@ class DatabaseManager:
             else:
                 self.logger.warning(f"Database discovery not implemented for type: {self.db_type}")
         except Exception as e:
-            self.logger.error(f"Error discovering databases: {e}")
+            self.logger.warning(f"Error discovering databases: {e}")
             raise
     
     def _discover_sqlite_databases(self):
@@ -1931,7 +1920,7 @@ class DatabaseManager:
             self.logger.info(f"Discovered {discovered_count} SQLite databases from {len(all_files)} files")
             
         except Exception as e:
-            self.logger.error(f"Error during SQLite database discovery: {e}")
+            self.logger.warning(f"Error during SQLite database discovery: {e}")
             raise
     
     def _validate_sqlite_file(self, file_path: str) -> bool:
@@ -1994,7 +1983,7 @@ class DatabaseManager:
                     self.logger.warning(f"Error closing MySQL discovery connection: {e}")
                 
         except Exception as e:
-            self.logger.error(f"Error discovering MySQL databases: {e}")
+            self.logger.warning(f"Error discovering MySQL databases: {e}")
             raise
     
     def _test_mysql_database_access(self, connector, base_config: dict, db_name: str) -> bool:
@@ -2040,7 +2029,7 @@ class DatabaseManager:
                 error_msg = results[0].error if results and results[0].error else 'Unknown error'
                 return self._create_error_response(error_msg)
         except Exception as e:
-            self.logger.error(f"Error executing {operation_type.value} for {db_id}: {e}")
+            self.logger.warning(f"Error executing {operation_type.value} for {db_id}: {e}")
             return self._create_error_response(str(e))
 
     def execute_query(self, db_id: str, sql: str, timeout: float = 2.0) -> Dict[str, Any]:
@@ -2071,7 +2060,7 @@ class DatabaseManager:
         try:
             return self.registry.list_databases()
         except Exception as e:
-            self.logger.error(f"Error listing databases: {e}")
+            self.logger.warning(f"Error listing databases: {e}")
             return []
     
     def database_exists(self, db_id: str) -> bool:
@@ -2082,7 +2071,7 @@ class DatabaseManager:
         try:
             return self.registry.database_exists(db_id)
         except Exception as e:
-            self.logger.error(f"Error checking database existence for {db_id}: {e}")
+            self.logger.warning(f"Error checking database existence for {db_id}: {e}")
             return False
     
     def get_database_info(self, db_id: str) -> Optional[Dict[str, Any]]:
@@ -2102,7 +2091,7 @@ class DatabaseManager:
                                   if k not in ['password', 'passwd']}
             }
         except Exception as e:
-            self.logger.error(f"Error getting database info for {db_id}: {e}")
+            self.logger.warning(f"Error getting database info for {db_id}: {e}")
             return None
     
     def refresh_database_registry(self):
@@ -2128,7 +2117,7 @@ class DatabaseManager:
             self.logger.info("Database registry refreshed successfully")
             
         except Exception as e:
-            self.logger.error(f"Error refreshing database registry: {e}")
+            self.logger.warning(f"Error refreshing database registry: {e}")
             raise
     
     def clear_cache(self):
@@ -2136,7 +2125,7 @@ class DatabaseManager:
             self.cache.clear_all()
             self.logger.info("Cache cleared successfully")
         except Exception as e:
-            self.logger.error(f"Error clearing cache: {e}")
+            self.logger.warning(f"Error clearing cache: {e}")
             raise
 
     def close(self):
@@ -2207,7 +2196,7 @@ class DatabaseManager:
             self.logger.info("DatabaseManager shutdown completed successfully")
             
         except Exception as e:
-            self.logger.error(f"Error during shutdown: {e}")
+            self.logger.warning(f"Error during shutdown: {e}")
             raise
     
     def get_stats(self) -> Dict[str, Any]:
@@ -2250,7 +2239,7 @@ class DatabaseManager:
                 'cleanup_timer_active': self._cleanup_timer is not None and self._cleanup_timer.is_alive()
             }
         except Exception as e:
-            self.logger.error(f"Error getting stats: {e}")
+            self.logger.warning(f"Error getting stats: {e}")
             return {'error': str(e), 'initialized': self._initialized}
     
     def health_check(self) -> Dict[str, Any]:
@@ -2348,7 +2337,7 @@ class DatabaseManager:
         except Exception as e:
             health_status['status'] = 'unhealthy'
             health_status['error'] = str(e)
-            self.logger.error(f"Health check failed: {e}")
+            self.logger.warning(f"Health check failed: {e}")
         
         return health_status
     

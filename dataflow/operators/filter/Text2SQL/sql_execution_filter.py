@@ -10,7 +10,7 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
 @OPERATOR_REGISTRY.register()
-class ExecutionFilter(OperatorABC):
+class SQLExecutionFilter(OperatorABC):
     def __init__(self, 
                  database_manager: DatabaseManager,
                  timeout: int = 5):
