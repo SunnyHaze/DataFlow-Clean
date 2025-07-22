@@ -10,7 +10,7 @@ from dataflow.operators.filter import (
 from dataflow.operators.eval import (
     SQLComponentClassifier,
     SQLExecutionClassifier
-)
+)   
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
 from dataflow.utils.text2sql.database_manager import DatabaseManager
@@ -26,7 +26,7 @@ class Text2SQLPipeline():
             cache_type="jsonl",
         )
 
-        llm_serving = LocalModelLLMServing_vllm(
+        self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
             vllm_tensor_parallel_size=1,
             vllm_max_tokens=8192,
@@ -39,7 +39,7 @@ class Text2SQLPipeline():
             vllm_max_tokens=8192,
         )
 
-        embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
+        self.embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
 
         # You can customize the difficulty config here, but it must contain 'thresholds' and 'labels' keys
         execution_difficulty_config = {
@@ -98,7 +98,7 @@ class Text2SQLPipeline():
         )
         
         self.sql_generator_step1 = SQLGenerator(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             generate_num=300
         )
@@ -109,8 +109,8 @@ class Text2SQLPipeline():
         )
 
         self.text2sql_question_generator_step3 = Text2SQLQuestionGenerator(
-            llm_serving=llm_serving,
-            embedding_api_llm_serving=embedding_serving,
+            llm_serving=self.llm_serving,
+            embedding_serving=self.embedding_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )
@@ -135,7 +135,7 @@ class Text2SQLPipeline():
         )
 
         self.sql_execution_classifier_step7 = SQLExecutionClassifier(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             difficulty_config=execution_difficulty_config,
             num_generations=5,

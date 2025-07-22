@@ -26,7 +26,7 @@ class Text2SQLPipeline():
             cache_type="jsonl",
         )
 
-        api_llm_serving = APILLMServing_request(
+        self.llm_serving = APILLMServing_request(
             api_url="http://api.openai.com/v1/chat/completions",
             model_name="gpt-4o",
             max_workers=100
@@ -39,7 +39,7 @@ class Text2SQLPipeline():
             max_workers=100
         )
 
-        embedding_api_llm_serving = APILLMServing_request(
+        embedding_serving = APILLMServing_request(
             api_url="http://api.openai.com/v1/embeddings",
             model_name="text-embedding-ada-002",
             max_workers=100
@@ -102,7 +102,7 @@ class Text2SQLPipeline():
         )
         
         self.sql_generator_step1 = SQLGenerator(
-            llm_serving=api_llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             generate_num=300
         )
@@ -113,8 +113,8 @@ class Text2SQLPipeline():
         )
 
         self.text2sql_question_generator_step3 = Text2SQLQuestionGenerator(
-            llm_serving=api_llm_serving,
-            embedding_api_llm_serving=embedding_api_llm_serving,
+            llm_serving=self.llm_serving,
+            embedding_serving=embedding_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )
@@ -139,7 +139,7 @@ class Text2SQLPipeline():
         )
 
         self.sql_execution_classifier_step7 = SQLExecutionClassifier(
-            llm_serving=api_llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             difficulty_config=execution_difficulty_config,
             num_generations=5,

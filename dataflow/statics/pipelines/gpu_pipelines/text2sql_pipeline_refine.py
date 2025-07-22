@@ -27,7 +27,7 @@ class Text2SQLPipeline():
             cache_type="jsonl"
         )
 
-        llm_serving = LocalModelLLMServing_vllm(
+        self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
             vllm_tensor_parallel_size=1,
             vllm_max_tokens=8192,
@@ -93,12 +93,12 @@ class Text2SQLPipeline():
         )
 
         self.sql_consistency_filter_step2 = SQLConsistencyFilter(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager
         )
 
         self.sql_variation_generator_step3 = SQLVariationGenerator(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             num_variations=5
         )
@@ -109,8 +109,8 @@ class Text2SQLPipeline():
         )
 
         self.text2sql_question_generator_step5 = Text2SQLQuestionGenerator(
-            llm_serving=llm_serving,
-            embedding_api_llm_serving=embedding_serving,
+            llm_serving=self.llm_serving,
+            embedding_serving=embedding_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )
@@ -135,7 +135,7 @@ class Text2SQLPipeline():
         )
 
         self.sql_execution_classifier_step9 = SQLExecutionClassifier(
-            llm_serving=llm_serving,
+            llm_serving=self.llm_serving,
             database_manager=database_manager,
             difficulty_config=execution_difficulty_config,
             num_generations=5,
