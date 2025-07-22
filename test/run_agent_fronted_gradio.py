@@ -29,6 +29,7 @@ def build_payload(
     api_key: str,
     chat_api: str,
     execute_operator: bool,
+    execute_pipeline: bool,   # NEW
     use_local_model: bool,
     local_model: str,
     timeout: int,
@@ -44,6 +45,7 @@ def build_payload(
         "api_key": api_key,
         "chat_api_url": chat_api,
         "execute_the_operator": execute_operator,
+        "execute_the_pipeline": execute_pipeline,   # NEW
         "use_local_model": use_local_model,
         "local_model_name_or_path": local_model,
         "timeout": timeout,
@@ -119,6 +121,7 @@ def normal_request(
     api_key: str,
     chat_api: str,
     execute_operator: bool,
+    execute_pipeline: bool,   
     use_local_model: bool,
     local_model: str,
     timeout: int,
@@ -127,7 +130,8 @@ def normal_request(
     payload = build_payload(
         language, target, model, session_key,
         json_file, py_path, api_key, chat_api,
-        execute_operator, use_local_model, local_model,
+        execute_operator, execute_pipeline,
+        use_local_model, local_model,
         timeout, max_debug,
     )
     try:
@@ -152,6 +156,7 @@ def stream_request(
     api_key: str,
     chat_api: str,
     execute_operator: bool,
+    execute_pipeline: bool,   # NEW
     use_local_model: bool,
     local_model: str,
     timeout: int,
@@ -163,7 +168,8 @@ def stream_request(
     payload = build_payload(
         language, target, model, session_key,
         json_file, py_path, api_key, chat_api,
-        execute_operator, use_local_model, local_model,
+        execute_operator, execute_pipeline,   # NEW
+        use_local_model, local_model,
         timeout, max_debug,
     )
 
@@ -206,7 +212,7 @@ def stream_request(
                         code_text = f"# 文件: {fp}\n\n{content}"
 
                     # 如执行了算子，则读取 cache_local
-                    if execute_operator:
+                    if execute_operator or execute_pipeline:
                         cache_data = read_cache_local()
                 elif evt == "error":
                     line = f"❌ 出错: {data['detail']}"
@@ -223,8 +229,8 @@ def stream_request(
 
 
 # ============ Gradio UI ============
-with gr.Blocks(title="DataFlow-Agent · 写算子 (Gradio)") as demo:
-    gr.Markdown("## 🛠️ DataFlow-Agent · 写算子 (Operator Writer)")
+with gr.Blocks(title="DataFlow-Agent ") as demo:
+    gr.Markdown("## 🛠️ DataFlow-Agent 算子编写+管线推荐")
 
     with gr.Row():
         api_base = gr.Textbox(label="后端地址", value="http://localhost:8000")
@@ -249,7 +255,8 @@ with gr.Blocks(title="DataFlow-Agent · 写算子 (Gradio)") as demo:
         value="")
 
     with gr.Row():
-        execute_operator = gr.Checkbox(label="执行算子", value=False)
+        execute_operator = gr.Checkbox(label="调试算子（耗费tokens）", value=False)
+        execute_pipeline = gr.Checkbox(label="调试pipeline（耗费tokens）", value=False)
         use_local_model  = gr.Checkbox(label="使用本地模型", value=False)
 
     local_model = gr.Textbox(label="本地模型路径",
@@ -277,7 +284,8 @@ with gr.Blocks(title="DataFlow-Agent · 写算子 (Gradio)") as demo:
         fn=normal_request,
         inputs=[api_base, language, model, session_key, target,
                 json_file, py_path, api_key, chat_api,
-                execute_operator, use_local_model, local_model,
+                execute_operator, execute_pipeline,  # NEW
+                use_local_model, local_model,
                 timeout, max_debug],
         outputs=[norm_status, norm_output],
     )
@@ -286,7 +294,8 @@ with gr.Blocks(title="DataFlow-Agent · 写算子 (Gradio)") as demo:
         fn=stream_request,
         inputs=[api_base, language, model, session_key, target,
                 json_file, py_path, api_key, chat_api,
-                execute_operator, use_local_model, local_model,
+                execute_operator, execute_pipeline,  # NEW
+                use_local_model, local_model,
                 timeout, max_debug],
         outputs=[stream_box, code_box, cache_box],
     )
