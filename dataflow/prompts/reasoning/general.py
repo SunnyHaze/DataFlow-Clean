@@ -111,21 +111,23 @@ class AnswerJudgePrompt:
     
     def build_prompt(self, question, answer, reference_answer):
         prompt = f"""
-        请你作为一个答案评判专家，评估以下答案是否正确。
+        As an answer evaluation expert, please assess whether the following answer is correct.
         
-        问题：{question}
+        Question: {question}
         
-        参考答案：{reference_answer}
+        Reference Answer: {reference_answer}
         
-        当前答案：{answer}
+        Current Answer: {answer}
         
-        请仔细分析当前答案与参考答案的语义是否一致。不要只看表面文字，要理解答案的实质内容。
-        如果当前答案在语义上与参考答案一致，即使表述方式不同，也应判定为正确。
+        Please carefully analyze whether the current answer is semantically consistent with the reference answer. 
+        Focus only on comparing the answers themselves, not on how the problem is solved.
+        Don't just look at the surface text, understand the essential content of the answers.
+        If the current answer is semantically consistent with the reference answer, even if expressed differently, it should be judged as correct.
         
-        请以JSON格式返回你的判断结果：
-        {{"judgement_result": true}} 表示答案正确
-        {{"judgement_result": false}} 表示答案错误
+        Please return your judgment result in JSON format:
+        {{"judgement_result": true}} indicates the answer is correct
+        {{"judgement_result": false}} indicates the answer is incorrect
         
-        请给出你的判断：
+        Your judgment:
         """
         return prompt

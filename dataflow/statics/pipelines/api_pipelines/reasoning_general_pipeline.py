@@ -48,7 +48,8 @@ class GeneralReasoningPipeline():
         )
         self.answer_model_judge_step4 = AnswerModelJudge(
             llm_serving=llm_serving,
-            prompt_template=AnswerJudgePrompt()
+            prompt_template=AnswerJudgePrompt(),
+            keep_all_samples=True
         )
         self.answer_ngram_filter_step5 = AnswerNgramFilter(
             min_score = 0.1,
