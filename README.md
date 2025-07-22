@@ -18,8 +18,6 @@
 [简体中文](./README-zh.md) | English
 
 
-**[🚀 Features](#-3-pipelines-functionality) • [⚡ Quick Start](#-4-quick-start) • [📖 Documentation](https://OpenDCAI.github.io/DataFlow-Doc/) • [🧪 Experiments](#-5-experimental-results)**
-
 </div>
 
 https://github.com/user-attachments/assets/05e047a5-99bb-4043-bc71-2b5ccdab2126
@@ -44,8 +42,26 @@ Agentic RAG: 输入QA，出来是 QA。没有额外信息解决不了，必须�
 Knowlege Base Cleaning: PDF，表格+doc text输入，输出是高质量知识库
 Dataflow-agent: 用Agent自动合成pipeline。编排已有算子。 -->
 
-## 🛠️ 3. Pipelines Functionality
-### 🔧 3.1 Ready-to-Use PipeLines
+## 🛠️ 3. Operators Functionality
+
+### 🔧 3.1 How Operators Work
+
+DataFlow adopts a modular operator design philosophy, building flexible data processing pipelines by combining different types of operators. As the basic unit of data processing, an operator can receive structured data input (such as in json/jsonl/csv format) and, after intelligent processing, output high-quality data results. For a detailed guide on using operators, please refer to the [Operator Documentation](https://opendcai.github.io/DataFlow-Doc/en/guide/text_evaluation_operators/ ).
+
+![](./static/images/dataflow_operator.jpg)
+
+### 📊 3.2 Operator Classification System
+
+In the DataFlow framework, operators are divided into three core categories based on their functional characteristics:
+
+| Operator Type | Quantity | Main Function |
+|---|---|---|
+| **Generic Operators** | 80+ | Covers general functions for text evaluation, processing, and synthesis |
+| **Domain-Specific Operators** | 40+ | Specialized processing for specific domains (e.g., medical, financial, legal) |
+| **Evaluation Operators** | 20+ | Comprehensively evaluates data quality from 6 dimensions |
+
+## 🛠️ 4. Pipelines Functionality
+### 🔧 4.1 Ready-to-Use PipeLines
 Current Pipelines in Dataflow are as follows:
 - 📝 **Text Pipeline**: Mine question-answer pairs from large-scale plain-text data (mostly crawed from InterNet) for use in SFT and RL training.
   - ![](./static/images/dataflow_text_pipeline.jpg)
@@ -60,10 +76,10 @@ Current Pipelines in Dataflow are as follows:
   - ![](./static/images/dataflow_KnowledgeBaseClean_pipeline.jpg)
 - 🤖 **Agentic RAG Pipeline**: Identify and extract QA pairs from existing QA datasets or knowledge bases that require external knowledge to answer, for use in downstream training of Agnetic RAG tasks.
   - ![](./static/images/dataflow_agenticRAG_pipeline.jpg)
-### ⚙️ 3.2 Flexible Operator PipeLines
+### ⚙️ 4.2 Flexible Operator PipeLines
 In this framework, operators are categorized into Fundamental Operators, Generic Operators, Domain-Specific Operators, and Evaluation Operators, etc., supporting data processing and evaluation functionalities. Please refer to the [documentation](https://OpenDCAI.github.io/DataFlow-Doc/) for details.
 
-### 🤖 3.3 Agent Guided Pipelines
+### 🤖 4.3 Agent Guided Pipelines
 <!-- Building on top of this, we also provide the -->
 - **DataFlow Agent**: An intelligent assistant that performs data analysis, writes custom `operators`, and automatically orchestrates them into `pipelines` based on specific task objectives.
 
@@ -73,7 +89,7 @@ In this framework, operators are categorized into Fundamental Operators, Generic
 <!-- ### 3.1 Text Pipeline
 ![](./static/images/demo_reasoning.png) -->
 
-## ⚡ 4. Quick Start
+## ⚡ 5. Quick Start
 For environment setup and installation, please using the following commands👇
 
 ```shell
@@ -117,27 +133,27 @@ For **Quick-Start** and **Guide**, please visit our [Documentation](https://Open
 [![Documents](https://img.shields.io/badge/Documents-Click_here-brightgreen?logo=read-the-docs)](https://OpenDCAI.github.io/DataFlow-Doc/)
 
 
-## 🧪 5. Experimental Results
+## 🧪 6. Experimental Results
 For Detailed Experiments setting, please visit our documentation.
 
 
-### 📝 5.1 Text PipeLine
+### 📝 6.1 Text PipeLine
 
-#### 5.1.1 Pre-training data filter pipeline
+#### 6.1.1 Pre-training data filter pipeline
 The `pre-training data processing pipeline` was applied to randomly sampled data from the RedPajama dataset, resulting in a final data retention rate of 13.65%. The analysis results using `QuratingScorer` are shown in the figure. As can be seen, the filtered pretraining data significantly outperforms the original data across four scoring dimensions: writing style, requirement for expert knowledge, factual content, and educational value. This demonstrates the effectiveness of the DataFlow pretraining data processing.
 
 <div align="center">
   <img src="./static/images/text-pretrain.png" width="60%">
 </div>
 
-#### 5.1.2 SFT data filter pipeline
+#### 6.1.2 SFT data filter pipeline
 We filted 3k record from `alpaca` dataset and compare it with radom selected 3k data from `alpaca` dataset by training it on Qwen2.5-7B. Results are:
 
 <div align="center">
   <img src="./static/images/text-sft.png" width="60%">
 </div>
 
-### 🧠 5.2 Reasoning Pipeline
+### 🧠 6.2 Reasoning Pipeline
 
 We verify our reasoning pipeline by SFT on a Qwen2.5-32B-Instruct with Reasoning Pipeline synsthized data. We generated 1k and 5k SFT data pairs. Results are: 
 
@@ -145,14 +161,14 @@ We verify our reasoning pipeline by SFT on a Qwen2.5-32B-Instruct with Reasoning
   <img src="./static/images/reasoning_performance.png" width="60%">
 </div>
 
-### 🗃️ 5.3 Text2SQL PipeLine
+### 🗃️ 6.3 Text2SQL PipeLine
 We fine-tuned the Qwen2.5-Coder-7B-Instruct model using both Supervised Fine-tuning (SFT) and Reinforcement Learning (RL), with data constructed via the DataFlow-Text2SQL Pipeline. Results are:
 
 <div align="center">
   <img src="./static/images/text2sql.png" width="60%">
 </div>
 
-## 📄 6. Publications
+## 📄 7. Publications
 Our team has published the following papers that form core components of the DataFlow system:
 
 | Paper Title | DataFlow Component | Venue | Year |
@@ -168,10 +184,10 @@ Our team has published the following papers that form core components of the Dat
 <img src="./static/logo/baichuan.png" alt="Baichuan" height="30"/> 
 <img src="./static/logo/ant_group.png" alt="Ant Group" height="30"/>
 
-## 💐 7. Acknowledgements
+## 💐 8. Acknowledgements
 We sincerely appreciate [MinerU](https://github.com/opendatalab/MinerU)'s outstanding contribution, particularly its robust text extraction capabilities from PDFs and documents, which greatly facilitates data loading.
 
-## 🤝 8. Community & Support
+## 🤝 9. Community & Support
 Join the DataFlow open-source community to ask questions, share ideas, and collaborate with other developers!
 
 •	📮 [GitHub Issues](../../issues): Report bugs or suggest features
@@ -184,7 +200,7 @@ Join the DataFlow open-source community to ask questions, share ideas, and colla
   <img src="./static/images/community_en.jpg" width="60%">
 </div>
 
-## 📜 9. Citation
+## 📜 10. Citation
 If you use DataFlow in your research, feel free to give us a cite.
 ```bibtex
 @misc{dataflow2025,
@@ -196,7 +212,7 @@ If you use DataFlow in your research, feel free to give us a cite.
 }
 ```
 
-## 📊 10. Statistics
+## 📊 11. Statistics
 <div align="center">
   <a href="https://star-history.com/#OpenDCAI/DataFlow&Date">
     <picture>
