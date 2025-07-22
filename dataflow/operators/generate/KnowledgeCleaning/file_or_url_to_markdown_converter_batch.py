@@ -8,6 +8,7 @@ from pathlib import Path
 from trafilatura import fetch_url, extract
 from urllib.parse import urlparse
 from tqdm import tqdm
+import requests
 
 def is_url(string):
     try:
@@ -118,6 +119,37 @@ def _parse_xml_to_md(raw_file:str=None, url:str=None, output_file:str=None):
 
     return output_file
 
+def is_pdf_url(url):
+    try:
+        # 发送HEAD请求，只获取响应头，不下载文件
+        response = requests.head(url, allow_redirects=True)
+        # 如果响应的Content-Type是application/pdf
+        if response.headers.get('Content-Type') == 'application/pdf':
+            return True
+        else:
+            print(f"Content-Type: {response.headers.get('Content-Type')}")
+            return False
+    except requests.exceptions.RequestException:
+        # 如果请求失败，返回False
+        return False
+
+def download_pdf(url, save_path):
+    try:
+        # 发送GET请求下载PDF文件
+        response = requests.get(url, stream=True)
+        # 确保响应内容是PDF
+        if response.status_code == 200 and response.headers.get('Content-Type') == 'application/pdf':
+            # 将PDF保存到本地
+            with open(save_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+            print(f"PDF saved to {save_path}")
+        else:
+            print("The URL did not return a valid PDF file.")
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading PDF: {e}")
+
 @OPERATOR_REGISTRY.register()
 class FileOrURLToMarkdownConverterBatch(OperatorABC):
     """
@@ -181,54 +213,63 @@ class FileOrURLToMarkdownConverterBatch(OperatorABC):
 
             if is_url(content):
                 # Case: Input is a URL
-
-                output_file = os.path.join(
-                    os.path.dirname(storage.first_entry_file_name),
-                    f"raw/crawled/crawled_{index}.md"
-                )
-                os.makedirs(os.path.dirname(output_file),exist_ok=True)
-                output_file = _parse_xml_to_md(url=content, output_file=output_file)
-                self.logger.info(f"Primary extracted result written to: {output_file}")
-                output_file_all.append(output_file)
-
-            else:
-                # Extract file name and extension
-                raw_file = content
-                raw_file_name = os.path.splitext(os.path.basename(raw_file))[0]
-                raw_file_suffix = os.path.splitext(raw_file)[1].lower()
-                raw_file_suffix_no_dot = raw_file_suffix.lstrip(".")
-
-                # Define default output path
-                output_file = os.path.join(
-                    self.intermediate_dir,
-                    f"{raw_file_name}_{raw_file_suffix_no_dot}.md"
-                )
-
-                # Case: Local file path
-                if not os.path.exists(content):
-                    self.logger.error(f"File not found: Path {content} does not exist.")
-                    output_file_all.append("")
-                    continue
-
-                _, ext = os.path.splitext(content)
-                ext = ext.lower()
-
-                if ext in [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"]:
-                    self.logger.info(f"Using MinerU backend: {self.mineru_backend}")
-                    output_file = _parse_file_with_mineru(
-                        raw_file=content,
-                        output_file=self.intermediate_dir,
-                        mineru_backend=self.mineru_backend
+                if is_pdf_url(content):
+                    pdf_save_path = os.path.join(
+                        os.path.dirname(storage.first_entry_file_name),
+                        f"raw/crawled/crawled_{index}.pdf"
                     )
-                elif ext in [".html", ".xml"]:
-                    output_file = _parse_xml_to_md(raw_file=content, output_file=output_file)
-                elif ext in [".txt", ".md"]:
-                    output_file = content  # No parsing needed for plain text or Markdown files
+                    self.logger.info(f"Downloading PDF from {content} to {pdf_save_path}")
+                    download_pdf(content, pdf_save_path)
+                    content = pdf_save_path
+                    self.logger.info(f"pdf file has been fetched and saved to {pdf_save_path}")
                 else:
-                    self.logger.error(f"Unsupported file type: {ext} for file {content}")
-                    output_file = ""
+                    output_file = os.path.join(
+                        os.path.dirname(storage.first_entry_file_name),
+                        f"raw/crawled/crawled_{index}.md"
+                    )
+                    os.makedirs(os.path.dirname(output_file),exist_ok=True)
+                    output_file = _parse_xml_to_md(url=content, output_file=output_file)
+                    self.logger.info(f"Primary extracted result written to: {output_file}")
+                    output_file_all.append(output_file)
+                    continue
+        
+            # Extract file name and extension
+            raw_file = content
+            raw_file_name = os.path.splitext(os.path.basename(raw_file))[0]
+            raw_file_suffix = os.path.splitext(raw_file)[1].lower()
+            raw_file_suffix_no_dot = raw_file_suffix.lstrip(".")
 
-                output_file_all.append(output_file)
+            # Define default output path
+            output_file = os.path.join(
+                self.intermediate_dir,
+                f"{raw_file_name}_{raw_file_suffix_no_dot}.md"
+            )
+
+            # Case: Local file path
+            if not os.path.exists(content):
+                self.logger.error(f"File not found: Path {content} does not exist.")
+                output_file_all.append("")
+                continue
+
+            _, ext = os.path.splitext(content)
+            ext = ext.lower()
+
+            if ext in [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"]:
+                self.logger.info(f"Using MinerU backend: {self.mineru_backend}")
+                output_file = _parse_file_with_mineru(
+                    raw_file=content,
+                    output_file=self.intermediate_dir,
+                    mineru_backend=self.mineru_backend
+                )
+            elif ext in [".html", ".xml"]:
+                output_file = _parse_xml_to_md(raw_file=content, output_file=output_file)
+            elif ext in [".txt", ".md"]:
+                output_file = content  # No parsing needed for plain text or Markdown files
+            else:
+                self.logger.error(f"Unsupported file type: {ext} for file {content}")
+                output_file = ""
+
+            output_file_all.append(output_file)
 
         # Save results back to storage
         dataframe[output_key] = output_file_all
