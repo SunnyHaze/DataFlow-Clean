@@ -17,7 +17,32 @@ class VendiScorer(OperatorABC):
         self.device = device
         self.score_name = 'VendiScore'
         self.logger.info(f'{self.__class__.__name__} initialized.')
-
+    
+    @staticmethod
+    def get_desc(lang: str = "zh"):
+        if lang == "zh":
+            return (
+                "通过计算VendiScore来评估数据集的多样性，使用BERT和SimCSE模型生成嵌入并计算分数。\n"
+                "输入参数：\n"
+                "- device：计算设备，默认为'cuda'\n"
+                "- input_key：输入文本字段名\n"
+                "输出参数：\n"
+                "- BERTVendiScore：基于BERT的多样性得分\n"
+                "- SimCSEVendiScore：基于SimCSE的多样性得分"
+            )
+        elif lang == "en":
+            return (
+                "Assess dataset diversity using VendiScore with embeddings from BERT and SimCSE models.\n"
+                "Input Parameters:\n"
+                "- device: Computing device, default 'cuda'\n"
+                "- input_key: Field name for input text\n"
+                "Output Parameters:\n"
+                "- BERTVendiScore: Diversity score based on BERT\n"
+                "- SimCSEVendiScore: Diversity score based on SimCSE"
+            )
+        else:
+            return "Assess dataset diversity using VendiScore."
+    
     def get_score(self, sentences):
         result = {}
         bert_vs = text_utils.embedding_vendi_score(sentences, model_path=self.bert_model_path, device=self.device)

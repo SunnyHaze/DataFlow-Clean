@@ -18,6 +18,29 @@ class RMScorer(OperatorABC):
         self.rank_model = AutoModelForSequenceClassification.from_pretrained(self.model_name, cache_dir=self.model_cache_dir).to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=self.model_cache_dir)
         self.logger.info(f'{self.__class__.__name__} initialized.')
+    
+    @staticmethod
+    def get_desc(lang: str = "zh"):
+        if lang == "zh":
+            return (
+                "基于人类偏好数据训练的奖励模型(OpenAssistant/reward-model-deberta-v3-large-v2)对文本质量进行打分，高分代表质量较高。" 
+                "模型输入为指令和响应文本对，输出0-1之间的奖励分数，反映人类对文本质量的偏好判断。\n" 
+                "输入参数：\n" 
+                "- instruction: 指令文本字符串\n" 
+                "- output: 响应文本字符串\n" 
+                "输出参数：\n" 
+                "- float: 0-1之间的奖励分数，越高表示质量越好"
+            )
+        else:
+            return (
+                "Score text quality using a reward model trained on human preference data (OpenAssistant/reward-model-deberta-v3-large-v2), where higher scores indicate better quality. " 
+                "The model takes instruction-response text pairs as input and outputs a reward score between 0 and 1, reflecting human preference judgments on text quality.\n" 
+                "Input parameters:\n" 
+                "- instruction: Instruction text string\n" 
+                "- output: Response text string\n" 
+                "Output parameters:\n" 
+                "- float: Reward score between 0 and 1, higher values indicate better quality"
+            )
 
     def eval(self, dataframe, input_instruction_key: str = 'instruction', input_output_key: str = 'output'):
         input_texts = dataframe.get(input_instruction_key, '').to_list()

@@ -16,7 +16,32 @@ class PerspectiveScorer(OperatorABC):
         self.serving = serving
         self.score_name = 'PerspectiveScore'
         self.logger.info(f"{self.__class__.__name__} initialized.")
-
+    
+    @staticmethod
+    def get_desc(lang: str = "zh"):
+        if lang == "zh":
+            return (
+                "使用Perspective API评估文本的毒性，返回毒性概率，得分越高表明文本毒性越高。\n"
+                "输入参数：\n"
+                "- serving：Perspective API服务对象\n"
+                "- input_key：输入文本字段名\n"
+                "- output_key：输出得分字段名，默认'PerspectiveScore'\n"
+                "输出参数：\n"
+                "- 包含毒性评估得分的DataFrame"
+            )
+        elif lang == "en":
+            return (
+                "Assess text toxicity using PerspectiveAPI; higher scores indicate more toxicity.\n"
+                "Input Parameters:\n"
+                "- serving: Perspective API serving object\n"
+                "- input_key: Field name for input text\n"
+                "- output_key: Field name for output score, default 'PerspectiveScore'\n"
+                "Output Parameters:\n"
+                "- DataFrame containing toxicity assessment scores"
+            )
+        else:
+            return "Assess text toxicity using PerspectiveAPI; higher scores indicate more toxicity."
+    
     def get_score(self, samples: list[dict], input_key: str) -> list[float]:
         # Extract texts, truncate if needed
         texts = []

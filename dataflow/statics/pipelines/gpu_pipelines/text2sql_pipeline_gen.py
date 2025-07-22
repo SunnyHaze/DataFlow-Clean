@@ -12,11 +12,11 @@ from dataflow.operators.eval import (
     SQLExecutionClassifier
 )   
 from dataflow.utils.storage import FileStorage
-from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm
+from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 
-class Text2SQLPipeline():
+class Text2SQLGeneration_GPUPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
@@ -32,6 +32,15 @@ class Text2SQLPipeline():
             vllm_max_tokens=8192,
         )
 
+        # use SGLang as LLM serving
+        # llm_serving = LocalModelLLMServing_sglang(
+        #     hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct",
+        #     sgl_dp_size=1, # data parallel size
+        #     sgl_tp_size=1, # tensor parallel size
+        #     sgl_max_tokens=1024,
+        #     sgl_tensor_parallel_size=4
+        # )
+
         # It is recommended to use better LLMs for the generation of Chain-of-Thought (CoT) reasoning process.
         cot_generation_llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct", # set to your own model path
@@ -39,7 +48,7 @@ class Text2SQLPipeline():
             vllm_max_tokens=8192,
         )
 
-        self.embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
+        embedding_serving = LocalModelLLMServing_vllm(hf_model_name_or_path="Alibaba-NLP/gte-Qwen2-7B-instruct", vllm_max_tokens=8192)
 
         # You can customize the difficulty config here, but it must contain 'thresholds' and 'labels' keys
         execution_difficulty_config = {
@@ -110,7 +119,7 @@ class Text2SQLPipeline():
 
         self.text2sql_question_generator_step3 = Text2SQLQuestionGenerator(
             llm_serving=self.llm_serving,
-            embedding_serving=self.embedding_serving,
+            embedding_serving=embedding_serving,
             database_manager=database_manager,
             question_candidates_num=5
         )
@@ -198,6 +207,6 @@ class Text2SQLPipeline():
         )
 
 if __name__ == "__main__":
-    model = Text2SQLPipeline()
+    model = Text2SQLGeneration_GPUPipeline()
     model.forward()
 

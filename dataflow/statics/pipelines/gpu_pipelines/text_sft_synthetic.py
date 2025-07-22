@@ -31,11 +31,11 @@ from dataflow.operators.refine import (
     RemoveEmojiRefiner,
     RemoveExtraSpacesRefiner
 )
-from dataflow.operators.generate import SupervisedFinetuneGenerator
-from dataflow.serving import LocalModelLLMServing_vllm
+from dataflow.operators.generate import SFTGeneratorSeed
+from dataflow.serving import LocalModelLLMServing_vllm, LocalModelLLMServing_sglang
 from dataflow.utils.storage import FileStorage
 
-class SFTTextSynPipeline():
+class SFTTextSynthetic_GPUPipeline():
     def __init__(self):
         self.storage = FileStorage(
             first_entry_file_name="../example_data/GeneralTextPipeline/pt_input.jsonl",
@@ -44,11 +44,21 @@ class SFTTextSynPipeline():
             cache_type="jsonl",
         )
         self.model_cache_dir = './dataflow_cache'
+        # use vllm as LLM serving
         self.llm_serving = LocalModelLLMServing_vllm(
             hf_model_name_or_path='Qwen/Qwen2.5-7B-Instruct',
             vllm_tensor_parallel_size=1,
             vllm_max_tokens=8192,
         )
+        # use SGLang as LLM serving
+        # self.llm_serving = LocalModelLLMServing_sglang(
+        #     hf_model_name_or_path="Qwen/Qwen2.5-7B-Instruct",
+        #     sgl_dp_size=1, # data parallel size
+        #     sgl_tp_size=1, # tensor parallel size
+        #     sgl_max_tokens=1024,
+        #     sgl_tensor_parallel_size=4
+        # )
+
         self.language_filter = LanguageFilter(allowed_languages = '__label__eng_Latn', model_cache_dir = self.model_cache_dir)        
         self.remove_extra_spaces_refiner = RemoveExtraSpacesRefiner()
         self.remove_emoji_refiner = RemoveEmojiRefiner()
@@ -75,7 +85,7 @@ class SFTTextSynPipeline():
         self.line_start_with_bulletpoint_filter = LineStartWithBulletpointFilter(threshold=0.9)
         self.line_with_javascript_filter = LineWithJavascriptFilter(threshold=3)
         self.quality_filter = PairQualFilter(min_score=-2, max_score=10000, lang='en')
-        self.sft_generator = SupervisedFinetuneGenerator(
+        self.sft_generator = SFTGeneratorSeed(
             llm_serving=self.llm_serving
         )
         self.word_number_filter_syn = WordNumberFilter(
@@ -226,5 +236,5 @@ class SFTTextSynPipeline():
 if __name__ == "__main__":
     # This is the entry point for the pipeline
 
-    model = SFTTextSynPipeline()
+    model = SFTTextSynthetic_GPUPipeline()
     model.forward()

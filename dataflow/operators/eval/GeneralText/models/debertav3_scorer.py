@@ -22,7 +22,36 @@ class DebertaV3Scorer(OperatorABC):
         self.model = QualityModel.from_pretrained(self.model_name, cache_dir=self.model_cache_dir).to(self.device)
         self.model.eval()
         self.logger.info(f'{self.__class__.__name__} initialized.')
-
+    
+    @staticmethod
+    def get_desc(lang: str = "zh"):
+        if lang == "zh":
+            return (
+                "基于Nvidia Deberta V3模型的质量分类器，用于评估文本质量并返回分类结果。\n"
+                "输入参数：\n"
+                "- model_name：预训练模型名称\n"
+                "- model_cache_dir：模型缓存目录，默认为'./dataflow_cache'\n"
+                "- device：计算设备，默认为'cuda'\n"
+                "- input_key：输入文本字段名\n"
+                "- output_key：输出分类结果字段名，默认为'Debertav3Score'\n"
+                "输出参数：\n"
+                "- 包含文本质量分类结果的DataFrame"
+            )
+        elif lang == "en":
+            return (
+                "Text quality classifier based on Nvidia Deberta V3 model for quality assessment and classification.\n"
+                "Input Parameters:\n"
+                "- model_name: Pretrained model name\n"
+                "- model_cache_dir: Model cache directory, default './dataflow_cache'\n"
+                "- device: Computing device, default 'cuda'\n"
+                "- input_key: Field name for input text\n"
+                "- output_key: Field name for output classification, default 'Debertav3Score'\n"
+                "Output Parameters:\n"
+                "- DataFrame containing text quality classification results"
+            )
+        else:
+            return "Text quality classifier based on Nvidia Deberta V3."
+    
     def _score_func(self, sample):
         inputs = self.tokenizer(
             sample, return_tensors="pt", padding="longest", truncation=True

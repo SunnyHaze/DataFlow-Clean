@@ -49,6 +49,32 @@ class NERRefiner(OperatorABC):
         self.logger.info(f"Initializing {self.__class__.__name__} ...")
         self.nlp = spacy.load("en_core_web_sm")
     
+    @staticmethod
+    def get_desc(lang: str = "zh"):
+        if lang == "zh":
+            return (
+                "使用命名实体识别（NER）技术识别并屏蔽文本中的特定实体。使用spaCy的'en_core_web_sm'模型识别实体，并将其替换为对应的实体类型标签。"
+                "输入参数：\n"
+                "- input_key：输入文本字段名\n"
+                "输出参数：\n"
+                "- 包含实体屏蔽后文本的DataFrame\n"
+                "- 返回输入字段名，用于后续算子引用"
+            )
+        elif lang == "en":
+            return (
+                "Mask specific entities in text using Named Entity Recognition (NER) technology. Uses spaCy's 'en_core_web_sm' model to identify entities \n"
+                "and replace them with corresponding entity type tags.\n"
+                "Input Parameters:\n"
+                "- input_key: Field name for input text\n\n"
+                "Output Parameters:\n"
+                "- DataFrame containing text with masked entities\n"
+                "- Returns input field name for subsequent operator reference"
+            )
+        else:
+            return (
+                "NERRefiner masks specific entities in text using Named Entity Recognition."
+            )
+    
     def run(self, storage: DataFlowStorage, input_key: str):
         self.input_key = input_key
         self.logger.info(f"Running {self.__class__.__name__} with input_key = {self.input_key}...")

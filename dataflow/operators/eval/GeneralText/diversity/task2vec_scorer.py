@@ -30,7 +30,40 @@ class Task2VecScorer(OperatorABC):
         self.device = torch.device(self.device if self.device and torch.cuda.is_available() else "cpu")
         self.probe_network = self.probe_network.to(self.device)
         self.logger.info(f'{self.__class__.__name__} initialized.')
-
+    
+    @staticmethod
+    def get_desc(lang: str = "zh"):
+        if lang == "zh":
+            return (
+                "使用Task2Vec方法评估数据集的多样性，通过计算样本嵌入的余弦距离矩阵来量化多样性。\n"
+                "输入参数：\n"
+                "- device：计算设备，默认为'cuda'\n"
+                "- sample_nums：采样次数，默认为10\n"
+                "- sample_size：每次采样样本数，默认为1\n"
+                "- method：嵌入方法，可选'montecarlo'或'variational'，默认为'montecarlo'\n"
+                "- model_cache_dir：模型缓存目录，默认为'./dataflow_cache'\n"
+                "- input_key：输入文本字段名\n"
+                "输出参数：\n"
+                "- Task2VecDiversityScore：多样性得分\n"
+                "- ConfidenceInterval：置信区间"
+            )
+        elif lang == "en":
+            return (
+                "Evaluate dataset diversity using Task2Vec by calculating cosine distance matrix of sample embeddings.\n"
+                "Input Parameters:\n"
+                "- device: Computing device, default 'cuda'\n"
+                "- sample_nums: Number of sampling iterations, default 10\n"
+                "- sample_size: Number of samples per iteration, default 1\n"
+                "- method: Embedding method, 'montecarlo' or 'variational', default 'montecarlo'\n"
+                "- model_cache_dir: Model cache directory, default './dataflow_cache'\n"
+                "- input_key: Field name for input text\n"
+                "Output Parameters:\n"
+                "- Task2VecDiversityScore: Diversity score\n"
+                "- ConfidenceInterval: Confidence interval"
+            )
+        else:
+            return "Evaluate dataset diversity using Task2Vec method."
+    
     def preprocess(self, texts):
         self.tokenizer.pad_token = self.tokenizer.eos_token
         tokenized_outputs = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt")

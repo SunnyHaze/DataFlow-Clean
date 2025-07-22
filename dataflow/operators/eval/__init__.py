@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from .Reasoning.difficulty_info import DifficultyInfo
     from .Reasoning.token_info import ToKenInfo
 
-    from .AgenticRAG.statistics.f1_scorer import F1Scorer
+    from .AgenticRAG.f1_scorer import F1Scorer
 
     from .Text2SQL.sql_component_classifier import SQLComponentClassifier
     from .Text2SQL.sql_execution_classifier import SQLExecutionClassifier
