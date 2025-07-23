@@ -66,7 +66,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     # --- webui ---
     p_webui = top.add_parser("webui", help="Launch Gradio WebUI")
-    p_webui.add_argument("-H", "--host", default="0.0.0.0", help="Bind host (default 0.0.0.0)")
+    p_webui.add_argument("-H", "--host", default="127.0.0.1", help="Bind host (default 127.0.0.1)")
     p_webui.add_argument("-P", "--port", type=int, default=7862, help="Port (default 7862)")
     p_webui.add_argument("--show-error", action="store_true", help="Show Gradio error tracebacks")
 
