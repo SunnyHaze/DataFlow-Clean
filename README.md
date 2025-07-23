@@ -139,7 +139,7 @@ dataflow webui
 This command will launch an interactive web interface, allowing you to seamlessly visualize and use all operators.
 
 <div align="center">
-  <img src="./static/images/dataflow_gradio.png" width="40%">
+  <img src="./static/images/dataflow_gradio.png" width="60%">
 </div>
 
 #### 5.3.2 DataFlow Agent Interface
@@ -153,7 +153,7 @@ dataflow webui agent
 This command will start the DataFlow-Agent interface, providing operator authoring capabilities and pipeline design services.
 
 <div align="center">
-  <img src="./static/images/dataflow_agent_gradio.png" width="40%">
+  <img src="./static/images/dataflow_agent_gradio.png" width="60%">
 </div>
 
 ### 📖 5.4 Reference Project Documentation
