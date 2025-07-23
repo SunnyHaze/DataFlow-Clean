@@ -134,7 +134,7 @@ dataflow webui
 该命令将启动一个交互式 Web 界面，使你能够无缝可视化并使用所有算子。
 
 <div align="center">
-  <img src="./static/images/dataflow_gradio.png" width="40%">
+  <img src="./static/images/dataflow_agent_gradio.png" width="60%">
 </div>
 
 #### 5.3.2 DataFlow智能体界面
@@ -148,7 +148,7 @@ dataflow webui agent
 该命令将启动DataFlow-Agent界面，提供算子编写功能和流水线设计服务。
 
 <div align="center">
-  <img src="./static/images/dataflow_agent_gradio.png" width="40%">
+  <img src="./static/images/dataflow_gradio.png" width="60%">
 </div>
 
 ### 📖 5.4 参考项目文档
