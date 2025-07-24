@@ -6,7 +6,6 @@ class PipelineABC(ABC):
     
     def __init__(self):
         self.op_runtimes = []
-        self.is_compiled = False
     
     @abstractmethod
     def forward(self):
