@@ -5,12 +5,11 @@ from dataflow.operators.filter import (
 from dataflow.operators.eval import MetaScorer
 from dataflow.serving import APILLMServing_request
 from dataflow.utils.storage import FileStorage
-from dataflow.wrapper.auto_op import AutoOp
 
-class AutoOpPipeline(PipelineABC):
+class AutoOPPipeline(PipelineABC):
     
     def __init__(self):
-        
+        super().__init__()
         self.storage = FileStorage(
             first_entry_file_name="./dataflow/example/GeneralTextPipeline/pt_input.jsonl",
             cache_path="./cache",
@@ -38,8 +37,7 @@ class AutoOpPipeline(PipelineABC):
         )
         
 if __name__ == "__main__":
-    pipeline = AutoOpPipeline()
-    # pipeline.autoop_register()
-    pipeline.forward()
-    print(AutoOp.op_runtimes)
-    # AutoOp.run_all() # Really run all operators
+    pipeline = AutoOPPipeline()
+    pipeline.compile()
+    print(pipeline.op_runtimes)
+    pipeline.run()

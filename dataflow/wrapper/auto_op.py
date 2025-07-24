@@ -25,7 +25,7 @@ class OPRuntime:
     def __repr__(self):
         return f"OPRuntime(operator={repr(self.op)}, func={self.func.__qualname__}, args={self.kwargs})"        
 
-class AutoOp(Generic[P, R]):
+class AutoOP(Generic[P, R]):
     """
     自动化运行 Operator 的 Wrapper。
 
@@ -33,10 +33,10 @@ class AutoOp(Generic[P, R]):
     运行时，会把 operator.run 的 __doc__ 和 __signature__ 也拷过来，
     这样 help(bw.run) 时能看到原 operator 的文档。
     """
-    op_runtimes = []
     
-    def __init__(self, operator: HasRun[P, R]):
+    def __init__(self, operator: HasRun[P, R], pipeline):
         self._operator = operator
+        self._pipeline = pipeline # <class 'dataflow.core.Pipeline.PipelineABC'>
         self._logger = get_logger()
         
         # 动态拷贝 operator.run 的 __doc__ 和 inspect.signature
@@ -56,9 +56,4 @@ class AutoOp(Generic[P, R]):
         final_kwargs = bound_args.arguments  # OrderedDict
 
         # 添加一条运行记录
-        self.__class__.op_runtimes.append(OPRuntime(self._operator, self._orig_run, dict(final_kwargs)))
-    
-    @classmethod
-    def run_all(cls):
-        for op_runtime in cls.op_runtimes:
-            op_runtime.func(**op_runtime.kwargs)
+        self._pipeline.op_runtimes.append(OPRuntime(self._operator, self._orig_run, dict(final_kwargs)))
