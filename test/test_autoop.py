@@ -39,7 +39,7 @@ class AutoOpPipeline(PipelineABC):
         
 if __name__ == "__main__":
     pipeline = AutoOpPipeline()
-    pipeline.autoop_register()
+    # pipeline.autoop_register()
     pipeline.forward()
     print(AutoOp.op_runtimes)
     # AutoOp.run_all() # Really run all operators
