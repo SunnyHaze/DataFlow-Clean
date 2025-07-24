@@ -40,4 +40,4 @@ if __name__ == "__main__":
     pipeline = AutoOPPipeline()
     pipeline.compile()
     print(pipeline.op_runtimes)
-    pipeline.run()
+    pipeline.forward()

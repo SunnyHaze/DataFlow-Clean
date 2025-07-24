@@ -16,15 +16,14 @@ class PipelineABC(ABC):
         pass
     
     def compile(self):
+        # TODO construct graph of keys and count objects
         for k, v in vars(self).items():
             if isinstance(v, OperatorABC):
                 setattr(self, k, AutoOP(v, self))
         self.forward()
-        self.is_compiled = True
-        
-    def run(self):
-        if self.is_compiled:
-            for op_runtime in self.op_runtimes:
-                op_runtime.func(**op_runtime.kwargs)
-        else:
-            self.forward()
+        self.forward = self._compiled_forward
+
+    def _compiled_forward(self):
+        # TODO add logic for Garbage Collection of Servings
+        for op_runtime in self.op_runtimes:
+            op_runtime.func(**op_runtime.kwargs)
