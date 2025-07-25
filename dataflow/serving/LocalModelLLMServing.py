@@ -1,5 +1,7 @@
 import os
 import torch
+import contextlib
+import time
 from typing import Optional, Union, List, Dict, Any
 from dataflow import get_logger
 from huggingface_hub import snapshot_download
@@ -24,7 +26,7 @@ class LocalModelLLMServing_vllm(LLMServingABC):
                  vllm_max_model_len: int = None,
                  vllm_gpu_memory_utilization: float=0.9,
                  ):
-
+        self.logger = get_logger()
         self.load_model(
             hf_model_name_or_path=hf_model_name_or_path,
             hf_cache_dir=hf_cache_dir,
@@ -142,13 +144,31 @@ class LocalModelLLMServing_vllm(LLMServingABC):
         return [output.outputs.embedding for output in outputs]
 
     def cleanup(self):
+        free_mem = torch.cuda.mem_get_info()[0]  # 返回可用显存（单位：字节）
+        total_mem = torch.cuda.get_device_properties(0).total_memory
+        self.logger.info(f"Free memory: {free_mem / (1024 ** 2):.2f} MB / {total_mem / (1024 ** 2):.2f} MB")
         self.logger.info("Cleaning up vLLM backend resources...")
         self.backend_initialized = False
+        from vllm.distributed.parallel_state import (
+            destroy_model_parallel,
+            destroy_distributed_environment,
+        )
+        del self.llm.llm_engine
         del self.llm
-        import gc;
+        destroy_model_parallel()
+        destroy_distributed_environment()
+        with contextlib.suppress(AssertionError):
+            torch.distributed.destroy_process_group()
+        import gc
         gc.collect()
         torch.cuda.empty_cache()
-    
+        import ray
+        ray.shutdown()
+        free_mem = torch.cuda.mem_get_info()[0]  # 返回可用显存（单位：字节）
+        total_mem = torch.cuda.get_device_properties(0).total_memory
+
+        self.logger.info(f"Free memory: {free_mem / (1024 ** 2):.2f} MB / {total_mem / (1024 ** 2):.2f} MB")
+            
 class LocalModelLLMServing_sglang(LLMServingABC):
     def __init__(
         self, 
@@ -182,6 +202,7 @@ class LocalModelLLMServing_sglang(LLMServingABC):
         sgl_stream_interval: Optional[int] = None,
         sgl_logit_bias: Optional[Dict[str, float]] = None,
     ):
+        self.logger = get_logger()
         self.load_model(
             hf_model_name_or_path=hf_model_name_or_path,
             hf_cache_dir=hf_cache_dir,
