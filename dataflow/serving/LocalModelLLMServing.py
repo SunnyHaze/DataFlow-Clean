@@ -363,11 +363,12 @@ class LocalModelLLMServing_sglang(LLMServingABC):
         return [output['text'] for output in responses]
     
     def generate_embedding_from_input(self, texts: list[str]) -> list[list[float]]:
-        if not self.backend_initialized:
-            self.start_serving()
-            self.llm.
-        outputs = self.llm.embed(texts)
-        return [output['embedding'] for output in outputs]
+        raise NotImplementedError("SGLang backend does not support embedding generation yet. If you have experience with SGLang, please contribute to this feature in Pull Request.")
+        # if not self.backend_initialized:
+            # self.start_serving()
+            # self.llm.
+        # outputs = self.llm.embed(texts)
+        # return [output['embedding'] for output in outputs]
     
     def cleanup(self):
         self.logger.info("Cleaning up SGLang backend resources...")
