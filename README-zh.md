@@ -18,8 +18,7 @@
 
 </div>
 
-[https://github.com/user-attachments/assets/05e047a5-99bb-4043-bc71-2b5ccdab2126](https://github.com/user-attachments/assets/d48f99f4-e687-4f6f-8076-db7c238c93ee)
-
+https://github.com/user-attachments/assets/bebe6e47-54bc-43da-abbc-a9c6a29ee44f
 
 ## 📰 1. 最新动态
 
@@ -141,7 +140,7 @@ dataflow webui agent
 
 该命令将启动 DataFlow-Agent 界面，提供自动化算子编写功能和流水线推荐服务。
 
-https://github.com/user-attachments/assets/a286d39f-00cf-4692-8d98-cc73475fca8b
+https://github.com/user-attachments/assets/5c6aa003-9504-4e2a-9f4e-97bae739894a
 
 ### 🌐 5.3 ADP智能数据平台
 
