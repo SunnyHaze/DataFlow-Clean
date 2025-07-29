@@ -150,13 +150,26 @@ https://github.com/user-attachments/assets/fda1ad47-a9f3-447a-b5c0-cf4c9ad64763
 
 ### 🌐 5.3 ADP Intelligent Data Platform
 
-In addition to the local Gradio interfaces, DataFlow also offers the web-based ADP Intelligent Data Platform:[https://adp.originhub.tech/login](https://adp.originhub.tech/login)
+Beyond the local Gradio interface, **DataFlow** is also available as a fully-managed SaaS solution on the **ADP Intelligent Data Platform**.
 
-ADP is an intelligent data platform launched by OriginHub. It features four core capabilities: full-process automation of data preparation with DataFlow, a knowledge system integrating large-scale multimodal knowledge bases, intelligent collaboration with multi-agent systems, and an AI database supporting full-lifecycle data management. It aims to accelerate enterprises in leveraging their unique data value through AI capabilities.
+[**ADP**](https://adp.originhub.tech) is an end-to-end system by OriginHub, designed to help enterprises accelerate the development of custom Agents and Models by integrating Large Language Models (LLMs) with private data.
 
-<div align="center">
-  <img src="./static/images/ADP.jpg" width="60%">
-</div>
+#### Core Capabilities:
+
+* 🤖 **Automated Data Preparation**: Leverage DataFlow for full-process automation of your data workflows.
+* 📚 **Unified Knowledge System**: Integrate and manage large-scale, multimodal knowledge bases.
+* 🤝 **Intelligent Collaboration**: Build and orchestrate powerful multi-agent systems.
+* 🗄️ **AI-Native Database**: Manage the full lifecycle of your multimodal data with a purpose-built AI database.
+
+<p align="center">
+  <a href="https://adp.originhub.tech/login">
+    <img src="./static/images/ADP.jpg" alt="ADP Platform Interface" width="75%">
+  </a>
+</p>
+
+#### Get Started for Free
+
+👉 **[Sign up now to claim your free compute credits!](https://adp.originhub.tech)**
 
 ### 📖 5.4 Reference Project Documentation
 
