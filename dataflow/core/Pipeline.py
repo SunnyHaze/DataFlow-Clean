@@ -38,15 +38,14 @@ class PipelineABC(ABC):
                     self.serving_reference_count[v] += 1
                     
     def _compiled_forward(self):
-        # TODO add logic for Garbage Collection of Servings
         
         # for loop for each op and its `storage` status
         for op_runtime in self.op_runtimes:
             is_serving_used = op_runtime.op in self.serving_resources and "LLMServingABC" in self.serving_resources[op_runtime.op]
             self.logger.debug(f"Ready to run {op_runtime}, is_serving_used={is_serving_used}, active_llm_serving={self.active_llm_serving}")
             if is_serving_used:
-                if self.active_llm_serving:
-                    self.logger.debug(f"Detected active LLM Serving {self.active_llm_serving}, cleaning up...")
+                if self.active_llm_serving and self.active_llm_serving is not self.serving_resources[op_runtime.op]["LLMServingABC"]:
+                    self.logger.debug(f"Detected active LLM Serving {self.active_llm_serving}, new serving {self.serving_resources[op_runtime.op]['LLMServingABC']}, cleaning up...")
                     self.active_llm_serving.cleanup()
                 self.active_llm_serving = self.serving_resources[op_runtime.op]["LLMServingABC"]
             # excute the run function of this op
