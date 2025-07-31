@@ -17,26 +17,81 @@ class LocalHostLLMAPIServing_vllm(LLMServingABC):
     """
     def __init__(self,
                  hf_model_name_or_path: str,
-                 port: int = 12345,
-                 host: str = "127.0.0.1",
-                 tensor_parallel_size: int = 1,
-                 max_model_len: int = None,
-                 gpu_memory_utilization: float = 0.9,
                  hf_cache_dir: str = None,
-                 server_start_timeout: int = 120,
-                 max_workers: int = 16):
+                 max_workers: int = 16,
+                 vllm_server_port: int = 12345,
+                 vllm_server_host: str = "127.0.0.1",
+                 vllm_tensor_parallel_size: int = 1,
+                 vllm_temperature: float = 0.7,
+                 vllm_top_p: float = 0.9,
+                 vllm_max_tokens: int = 1024,
+                 vllm_top_k: int = 40,
+                 vllm_max_model_len: int = None,
+                 vllm_gpu_memory_utilization: float = 0.9,
+                 vllm_server_start_timeout: int = 120,
+                 ):
         self.logger = get_logger()
         self.hf_model_name_or_path = hf_model_name_or_path
-        self.port = port
-        self.host = host
-        self.tensor_parallel_size = tensor_parallel_size
-        self.max_model_len = max_model_len
-        self.gpu_memory_utilization = gpu_memory_utilization
+        self.port = vllm_server_port
+        self.host = vllm_server_host
+        self.tensor_parallel_size = vllm_tensor_parallel_size
+        self.temperature = vllm_temperature
+        self.top_p = vllm_top_p
+        self.max_tokens = vllm_max_tokens
+        self.top_k = vllm_top_k
+        self.max_model_len = vllm_max_model_len
+        self.gpu_memory_utilization = vllm_gpu_memory_utilization
         self.hf_cache_dir = hf_cache_dir
-        self.server_start_timeout = server_start_timeout
+        self.server_start_timeout = vllm_server_start_timeout
         self.max_workers = max_workers
         self.process = None
         self.backend_initialized = False
+
+    def _stream_subprocess_logs(self, pipe):
+        """
+        持续读取子进程输出，只保留 INFO/ERROR/Traceback
+        """
+        traceback_mode = False
+        is_keyboard_interrupted = False
+        traceback_info_list = []
+        for line in iter(pipe.readline, ''):
+            line = line.rstrip("\n")
+            if not line:
+                continue
+
+            # 判断traceback
+            if line.startswith("Traceback"):
+                traceback_mode = True
+                traceback_info_list.append(line)
+                if "KeyboardInterrupt: MQLLMEngine terminated" in line:
+                    is_keyboard_interrupted = True
+                continue
+
+            # 如果处于traceback模式，输出所有行直到空行结束
+            if traceback_mode:
+                traceback_info_list.append(line)
+                if "MQLLMEngine terminated" in line:
+                    is_keyboard_interrupted = True
+                if line == "":
+                    traceback_mode = False
+                continue
+
+            # 仅保留 INFO 和 ERROR
+            if re.match(r"^(INFO|ERROR):", line):
+                if "INFO:" in line:
+                    if "POST" in line:
+                        self.logger.debug(line)
+                    else:
+                        self.logger.info(line)
+                else:
+                    self.logger.error(line)
+        
+        if is_keyboard_interrupted:
+            self.logger.success("MQLLMEngine terminated")
+        else:
+            for log in traceback_info_list:
+                print(log)
+        self.is_error = not is_keyboard_interrupted
 
     def start_serving(self):
         if self.backend_initialized:
@@ -57,13 +112,25 @@ class LocalHostLLMAPIServing_vllm(LLMServingABC):
             command += ["--download-dir", self.hf_cache_dir]
 
         self.logger.info(f"Starting vLLM server with command: {' '.join(command)}")
-        self.process = subprocess.Popen(command, preexec_fn=os.setsid)
+        self.process = subprocess.Popen(
+            command, 
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,                 
+            preexec_fn=os.setsid
+        )
+
+ # 后台线程处理日志
+        Thread(target=self._stream_subprocess_logs, args=(self.process.stdout,), daemon=True).start()
+        Thread(target=self._stream_subprocess_logs, args=(self.process.stderr,), daemon=True).start()
 
         for i in range(self.server_start_timeout):  # 增加等待时间
+            if hasattr(self, "is_error") and self.is_error:
+                break
             try:
                 response = requests.get(f"http://{self.host}:{self.port}/v1/models", timeout=1.0)
                 status = response.status_code
-                self.logger.debug(f"[{i+1}/90] Status: {status}")
+                self.logger.debug(f"[{i+1}/{self.server_start_timeout}] Status: {status}")
                 if status == 200:
                     self.backend_initialized = True
                     self.logger.success("vLLM server started successfully!")
@@ -73,7 +140,10 @@ class LocalHostLLMAPIServing_vllm(LLMServingABC):
             time.sleep(1)
 
         self.cleanup()
-        raise RuntimeError("Failed to start vLLM server within timeout.")
+        if self.is_error:
+            raise RuntimeError("Failed to start vLLM server. Please check the logs for more information.")
+        else:
+            raise RuntimeError("Failed to start vLLM server within timeout. You can try increase server_start_timeout argument.")
 
     def format_response(self, response: dict) -> str:    
         # check if content is formatted like <think>...</think>...<answer>...</answer>
@@ -96,9 +166,10 @@ class LocalHostLLMAPIServing_vllm(LLMServingABC):
                 payload = {
                     "model": self.hf_model_name_or_path,
                     "messages": payload,
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "max_tokens": 1024
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                    "top_k": self.top_k,
+                    "max_tokens": self.max_tokens
                 }
 
                 response = requests.post(f"http://{self.host}:{self.port}/v1/chat/completions", json=payload)
@@ -108,7 +179,7 @@ class LocalHostLLMAPIServing_vllm(LLMServingABC):
                     # logging.info(f"API response: {response_data['choices'][0]['message']['content']}")
                     return id,self.format_response(response_data)
                 else:
-                    logging.error(f"API request failed with status {response.status_code}: {response.text}")
+                    self.logger.error(f"API request failed with status {response.status_code}: {response.text}")
                     return id, None
             except Exception as e:
                 self.logger.error(f"API request error: {e}")
