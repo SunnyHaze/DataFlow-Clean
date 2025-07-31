@@ -18,7 +18,7 @@ class LocalHostLLMAPIServing_vllm(LLMServingABC):
     def __init__(self,
                  hf_model_name_or_path: str,
                  hf_cache_dir: str = None,
-                 max_workers: int = 16,
+                 max_workers: int = 1,
                  vllm_server_port: int = 12345,
                  vllm_server_host: str = "127.0.0.1",
                  vllm_tensor_parallel_size: int = 1,
