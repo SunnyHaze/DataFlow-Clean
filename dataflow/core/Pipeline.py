@@ -8,11 +8,11 @@ from dataflow.logger import get_logger
 class PipelineABC(ABC):
     
     def __init__(self):
-        self.op_runtimes = []
+        self.op_runtimes = [] # list of dict, contains
         self.logger = get_logger()
         self.active_llm_serving = None
-        self.resource_map = defaultdict(dict)
-        self.ref_map = Counter()
+        self.serving_resources = defaultdict(dict)
+        self.serving_reference_count = Counter()
     
     @abstractmethod
     def forward(self):
@@ -34,23 +34,28 @@ class PipelineABC(ABC):
         for op_runtime in self.op_runtimes:
             for _, v in vars(op_runtime.op).items():
                 if isinstance(v, LLMServingABC):
-                    self.resource_map[op_runtime.op]["LLMServingABC"] = v
-                    self.ref_map[v] += 1
+                    self.serving_resources[op_runtime.op]["LLMServingABC"] = v
+                    self.serving_reference_count[v] += 1
                     
     def _compiled_forward(self):
         # TODO add logic for Garbage Collection of Servings
+        
+        # for loop for each op and its `storage` status
         for op_runtime in self.op_runtimes:
-            is_serving_used = op_runtime.op in self.resource_map and "LLMServingABC" in self.resource_map[op_runtime.op]
+            is_serving_used = op_runtime.op in self.serving_resources and "LLMServingABC" in self.serving_resources[op_runtime.op]
             self.logger.debug(f"Ready to run {op_runtime}, is_serving_used={is_serving_used}, active_llm_serving={self.active_llm_serving}")
             if is_serving_used:
                 if self.active_llm_serving:
                     self.logger.debug(f"Detected active LLM Serving {self.active_llm_serving}, cleaning up...")
                     self.active_llm_serving.cleanup()
-                self.active_llm_serving = self.resource_map[op_runtime.op]["LLMServingABC"]
+                self.active_llm_serving = self.serving_resources[op_runtime.op]["LLMServingABC"]
+            # excute the run function of this op
             op_runtime.func(**op_runtime.kwargs)
+            
+            # Garbage Collection for out of dated serving.
             if is_serving_used:
-                self.ref_map[self.active_llm_serving] -= 1
-                if self.ref_map[self.active_llm_serving] == 0:
+                self.serving_reference_count[self.active_llm_serving] -= 1
+                if self.serving_reference_count[self.active_llm_serving] == 0:
                     self.logger.debug(f"Detected LLM Serving {self.active_llm_serving} ref reduced to 0, cleaning up...")
                     self.active_llm_serving.cleanup()
                     self.active_llm_serving = None
