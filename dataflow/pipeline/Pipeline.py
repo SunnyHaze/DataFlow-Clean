@@ -43,6 +43,10 @@ class PipelineABC(ABC):
         # after call forward, call back function in AutoOP will add the OPRuntime object to self.op_runtimes
         
         self.forward = self._compiled_forward
+        self.logger.info(
+            f"Compiling pipeline and validating key integrity "
+            f"across {len(self.op_runtimes)} operator runtimes."
+        )
         self._build_operator_nodes_graph()
         # self._build_serving_resources_map()
         
@@ -84,7 +88,7 @@ class PipelineABC(ABC):
         else:
             iter_storage_keys = []
 
-        print("start keys", iter_storage_keys)
+        # print("start keys", iter_storage_keys)
 
         # all keys in the first storage will be the initial keys for validation
         self.accumulated_keys.append(copy.deepcopy(iter_storage_keys))
@@ -92,13 +96,13 @@ class PipelineABC(ABC):
         # build graph of all operators and keys from all states
         for op_node in self.op_nodes_list:
             # check if accumulated_keys have the input keys of this operator
-            print(op_node, op_node.input_keys, op_node.output_keys)
+            # print(op_node, op_node.input_keys, op_node.output_keys)
             for input_key in op_node.input_keys:
                 if input_key not in self.accumulated_keys[-1]:
                     error_msg = (
-                        f"Input key '{input_key}' does not match any output keys from previous operators "
+                        f"Input key '{input_key}' in `{op_node.op_name}` does not match any output keys from previous operators "
                         f"or any dataset keys. Please check parameter "
-                        f"'{op_node.input_key_nodes[input_key].key_para_name}' of operator "
+                        f"'{op_node.input_key_nodes[input_key].key_para_name}' in the `run()` of the operator "
                         f"'{op_node.op_name}' (class '{op_node.op_obj.__class__.__name__}')."
                     )
                     self.logger.warning(error_msg)
@@ -111,7 +115,8 @@ class PipelineABC(ABC):
         self.final_keys = copy.deepcopy(iter_storage_keys)
         
         for i, keys in enumerate(self.accumulated_keys):
-            print(i, keys)
+            # print(i, keys)
+            pass
         self.logger.debug(f"Accumulated keys after building graph: {self.accumulated_keys}")
     
         self.dataset_node = OperatorNode(
@@ -128,7 +133,7 @@ class PipelineABC(ABC):
         self.last_modified_index_of_keys: dict[list] = {}
         for key in self.final_keys:
             self.last_modified_index_of_keys[key] = []
-        print(self.last_modified_index_of_keys)
+        # print(self.last_modified_index_of_keys)
 
         # now the first op node is THEDATASET op
         for idx, i_op in enumerate(self.op_nodes_list):
@@ -150,10 +155,12 @@ class PipelineABC(ABC):
                 self.last_modified_index_of_keys[output_key].append(idx)
 
         for key, value in self.last_modified_index_of_keys.items():
-            print(key, value)
+            # print(key, value)
+            pass
                     
         for op in self.op_nodes_list:
-            print(op)
+            # print(op)
+            pass
             
     # def _build_serving_resources_map(self):
     #     for op_runtime in self.op_runtimes:
