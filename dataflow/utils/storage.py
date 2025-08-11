@@ -11,6 +11,13 @@ class DataFlowStorage(ABC):
     Abstract base class for data storage.
     """
     @abstractmethod
+    def get_keys_from_dataframe(self) -> list[str]:
+        """
+        Get keys from the dataframe stored in the storage.
+        This method should be implemented by subclasses to extract keys from the data.
+        """
+        pass
+    @abstractmethod
     def read(self, output_type) -> Any:
         """
         Read data from file.
@@ -97,11 +104,15 @@ class FileStorage(DataFlowStorage):
 
     def step(self):
         self.operator_step += 1
-        return copy.copy(self)
+        return copy.copy(self) # TODO if future maintain an object in memory, we need to apply a deepcopy (except the dataframe object during copy to avoid OOM)
     
     def reset(self):
         self.operator_step = -1
         return self
+    
+    def get_keys_from_dataframe(self) -> list[str]:
+        dataframe = self.read(output_type="dataframe")
+        return dataframe.columns.tolist() if isinstance(dataframe, pd.DataFrame) else []
     
     def _load_local_file(self, file_path: str, file_type: str) -> pd.DataFrame:
         """Load data from local file based on file type."""

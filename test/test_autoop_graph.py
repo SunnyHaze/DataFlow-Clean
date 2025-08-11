@@ -1,8 +1,8 @@
-from dataflow.core import PipelineABC
-from dataflow.operators.filter import (
-    LLMLanguageFilter,
-)
-from dataflow.operators.eval import MetaScorer
+from dataflow.pipeline import PipelineABC
+# from dataflow.operators.filter import (
+    # LLMLanguageFilter,
+# )
+# from dataflow.operators.eval import MetaScorer
 from dataflow.operators.generate import PromptedGenerator
 from dataflow.serving import APILLMServing_request, LocalModelLLMServing_vllm, LocalHostLLMAPIServing_vllm
 from dataflow.utils.storage import FileStorage
@@ -12,7 +12,7 @@ class AutoOPPipeline(PipelineABC):
     def __init__(self):
         super().__init__()
         self.storage = FileStorage(
-            first_entry_file_name="./dataflow/example/GeneralTextPipeline/pt_input.jsonl",
+            first_entry_file_name="../dataflow/example/GeneralTextPipeline/pt_input.jsonl",
             cache_path="./cache",
             file_name_prefix="dataflow_cache_auto_run",
             cache_type="jsonl",
@@ -27,32 +27,36 @@ class AutoOPPipeline(PipelineABC):
         )
         self.op2 = PromptedGenerator(
             llm_serving=self.llm_serving,
-            system_prompt="请将以下内容翻译成中文：",
+            system_prompt="请将以下内容翻译成韩文：",
         )
         self.op3 = PromptedGenerator(
             llm_serving=self.llm_serving,
-            system_prompt="请将以下内容翻译成中文："
+            system_prompt="请将以下内容翻译成日语："
         )
         
     def forward(self):
         self.op1.run(
             self.storage.step(),
             input_key='raw_content',
-            output_key='content_cn1'
+            # output_key='content_CN'
+            output_key="raw_content"
         )
         self.op2.run(
             self.storage.step(),
-            input_key='raw_content',
-            output_key='content_cn2'
+            # input_key='raw_contents',
+            input_key="raw_content",
+            output_key='content_JA'
         )
         self.op3.run(
             self.storage.step(),
             input_key='raw_content',
-            output_key='content_cn3'
+            output_key='content_KR'
         )
         
 if __name__ == "__main__":
     pipeline = AutoOPPipeline()
     pipeline.compile()
-    print(pipeline.op_runtimes)
+    print(pipeline.llm_serving_list)
+    print(pipeline.llm_serving_counter)
+    # print(pipeline.op_runtimes)
     pipeline.forward()

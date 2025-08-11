@@ -3,6 +3,7 @@ from functools import wraps
 import inspect
 from dataflow.logger import get_logger
 from dataflow.core import OperatorABC
+# from dataflow.core.graph import nodes
 from tqdm import tqdm
 import pandas as pd
 P = ParamSpec("P")
@@ -17,13 +18,21 @@ class HasRun(Protocol[P, R]):
         ...
         
 class OPRuntime:
-    def __init__(self, operator: OperatorABC, func: callable, args: Dict[str, Any]):
+    def __init__(
+        self, 
+        operator: OperatorABC, 
+        operator_name: str,
+        # func: callable, 
+        args: Dict[str, Any]
+        ):
         self.op = operator
-        self.func = func
+        self.op_name = operator_name
+        # self.func = func
         self.kwargs = args
 
     def __repr__(self):
-        return f"OPRuntime(operator={repr(self.op)}, func={self.func.__qualname__}, args={self.kwargs})"        
+        # return f"OPRuntime(operator={repr(self.op)}, func={self.func.__qualname__}, args={self.kwargs})"        
+        return f"OPRuntime(operator={repr(self.op)}, args={self.kwargs})"
 
 class AutoOP(Generic[P, R]):
     """
@@ -34,14 +43,15 @@ class AutoOP(Generic[P, R]):
     这样 help(bw.run) 时能看到原 operator 的文档。
     """
     
-    def __init__(self, operator: HasRun[P, R], pipeline):
+    def __init__(self, operator: HasRun[P, R], operator_name, pipeline):
         self._operator = operator
+        self._operator_name = operator_name
         self._pipeline = pipeline # <class 'dataflow.core.Pipeline.PipelineABC'>
         self._logger = get_logger()
         
         # 动态拷贝 operator.run 的 __doc__ 和 inspect.signature
         self._orig_run = operator.run
-        self._signature = inspect.signature(self._orig_run)
+        self._signature = inspect.signature(operator.run)
         self.__doc__ = self._orig_run.__doc__
 
     def run(self, *args: P.args, **kwargs: P.kwargs) -> R:
@@ -56,4 +66,11 @@ class AutoOP(Generic[P, R]):
         final_kwargs = bound_args.arguments  # OrderedDict
 
         # 添加一条运行记录
-        self._pipeline.op_runtimes.append(OPRuntime(self._operator, self._orig_run, dict(final_kwargs)))
+        # self._pipeline.op_runtimes.append(OPRuntime(self._operator, self._orig_run, dict(final_kwargs)))
+        self._pipeline.op_runtimes.append(
+            OPRuntime(
+                operator=self._operator, 
+                operator_name=self._operator_name,
+                args=dict(final_kwargs)
+            )
+        )
