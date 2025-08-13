@@ -18,9 +18,12 @@ class AutoOPPipeline(PipelineABC):
             cache_type="jsonl",
         )
         self.llm_serving = LocalModelLLMServing_vllm(
-            hf_model_name_or_path="/data0/public_models/Qwen2.5-7B-Instruct"
+            hf_model_name_or_path="/mnt/public/model/huggingface/Qwen3-0.6B"
         )
-
+        # self.llm_serving = LocalHostLLMAPIServing_vllm(
+        #     hf_model_name_or_path="/mnt/public/model/Qwen/Qwen2.5-0.5B-Instruct/",
+        #     vllm_gpu_memory_utilization=0.8
+        # )
         self.op1 = PromptedGenerator(
             llm_serving=self.llm_serving,
             system_prompt="请将以下内容翻译成中文：",
@@ -43,8 +46,8 @@ class AutoOPPipeline(PipelineABC):
         )
         self.op2.run(
             self.storage.step(),
-            # input_key='raw_contents',
-            input_key="raw_content",
+            input_key='raw_content',
+            # input_key="raw_content",
             output_key='content_JA'
         )
         self.op3.run(
@@ -58,5 +61,9 @@ if __name__ == "__main__":
     pipeline.compile()
     print(pipeline.llm_serving_list)
     print(pipeline.llm_serving_counter)
+    pipeline.draw_graph(
+        port=8081,
+        hide_no_changed_keys=True
+    )
     # print(pipeline.op_runtimes)
-    pipeline.forward()
+    # pipeline.forward()

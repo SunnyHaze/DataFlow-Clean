@@ -67,10 +67,15 @@ class OperatorNode(object):
             else: # warning for unexpected keys with red color
                 print(f"\033[91mWarning: Unexpected key '{k}' in operator {self.op_obj.__class__.__name__}\033[0m")
         
-    def init_dataset_node(self, keys:list[str]):
+    def init_output_keys_nodes(self, keys:list[str]):
         for key in keys:
             self.output_keys.append(key)
             self.output_keys_nodes[key]= KeyNode(key,key)
+    def init_input_keys_nodes(self, keys:list[str]):
+        for key in keys:
+            self.input_keys.append(key)
+            self.input_key_nodes[key] = KeyNode(key, key)
+
     def __str__(self):
         op_class = self.op_obj.__class__.__name__ if self.op_obj else "None"
         input_keys_str = ', '.join(self.input_keys)

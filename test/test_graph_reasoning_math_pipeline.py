@@ -154,4 +154,5 @@ class ReasoningMath_GPUPipeline(PipelineABC):
 if __name__ == "__main__":
     model = ReasoningMath_GPUPipeline()
     model.compile()
+    model.draw_graph(port=8080)
     # model.forward()

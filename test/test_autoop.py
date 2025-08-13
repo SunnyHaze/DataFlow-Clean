@@ -1,4 +1,4 @@
-from dataflow.core import PipelineABC
+from dataflow.pipeline import PipelineABC
 from dataflow.operators.filter import (
     LLMLanguageFilter,
 )
@@ -13,7 +13,7 @@ class AutoOPPipeline(PipelineABC):
         super().__init__()
         self.storage = FileStorage(
             first_entry_file_name="./dataflow/example/GeneralTextPipeline/pt_input.jsonl",
-            cache_path="./cache",
+            cache_path="./cache_autoop",
             file_name_prefix="dataflow_cache_auto_run",
             cache_type="jsonl",
         )
@@ -29,11 +29,11 @@ class AutoOPPipeline(PipelineABC):
         )
         self.op2 = PromptedGenerator(
             llm_serving=self.llm_serving2,
-            system_prompt="请将以下内容翻译成中文：",
+            system_prompt="请将以下内容翻译成韩文：",
         )
         self.op3 = PromptedGenerator(
             llm_serving=self.llm_serving1,
-            system_prompt="请将以下内容翻译成中文："
+            system_prompt="请将以下内容翻译成日语："
         )
         
     def forward(self):
