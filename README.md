@@ -20,7 +20,7 @@
 
 </div>
 
-https://github.com/user-attachments/assets/05e047a5-99bb-4043-bc71-2b5ccdab2126
+https://github.com/user-attachments/assets/19742159-cfe0-42a6-9d3d-152466d2d588
 
 ## 📰 1. News
 🎉 [2025-06-28] We’re excited to announce that DataFlow, our Data-centric AI system, is now released! Stay tuned for future updates.
@@ -107,9 +107,7 @@ pip install open-dataflow[vllm]
 ```
 > DataFlow supports Python>=3.10 environments
 
-### ✅ 5.2 Verify Installation
-
-You can use the following command to check if DataFlow is installed correctly:
+After installation, you can use the following command to check if dataflow has been installed correctly:
 
 ```shell
 dataflow -v
@@ -124,37 +122,54 @@ open-dataflow codebase version: 1.0.0
 You are using the latest version: 1.0.0.
 ```
 
-### 🌐 5.3 Using Gradio Web Interface
+### 🚀 5.2 Using the Gradio Web Interface
 
-DataFlow provides two interactive web interfaces to help you work with operators and agent:
+DataFlow provides two interactive web interfaces to help you use operators, pipelines, and agents:
 
-#### 5.3.1 DataFlow Operators Interface
+#### 5.2.1 DataFlow Operators Interface
 
-Launch the DataFlow operators interface to test and visualize all operators:
+Launch the DataFlow operator interface to test and visualize all operators and pipelines:
 
 ```bash
 dataflow webui
 ```
 
-This command will launch an interactive web interface, allowing you to seamlessly visualize and use all operators.
+This command will start an interactive web interface, allowing you to visualize and flexibly use all operators and pipelines.
 
-<div align="center">
-  <img src="./static/images/dataflow_agent_gradio.png" width="60%">
-</div>
+#### 5.2.2 DataFlow Agent Interface
 
-#### 5.3.2 DataFlow Agent Interface
-
-Launch the DataFlow agent interface for operator authoring and pipeline recommendation:
+Launch the DataFlow agent interface for operator authoring and pipeline design:
 
 ```bash
 dataflow webui agent
 ```
 
-This command will start the DataFlow-Agent interface, providing operator authoring capabilities and pipeline design services.
+This command will start the DataFlow-Agent interface, providing automated operator authoring and pipeline recommendation services.
 
-<div align="center">
-  <img src="./static/images/dataflow_gradio.png" width="60%">
-</div>
+https://github.com/user-attachments/assets/fda1ad47-a9f3-447a-b5c0-cf4c9ad64763
+
+### 🌐 5.3 ADP Intelligent Data Platform
+
+Beyond the local Gradio interface, **DataFlow** is also available as a fully-managed SaaS solution on the **ADP Intelligent Data Platform**.
+
+[**ADP**](https://adp.originhub.tech) is an end-to-end system by OriginHub, designed to help enterprises accelerate the development of custom Agents and Models by integrating Large Language Models (LLMs) with private data.
+
+#### Core Capabilities:
+
+* 🤖 **Automated Data Preparation**: Leverage DataFlow for full-process automation of your data workflows.
+* 📚 **Unified Knowledge System**: Integrate and manage large-scale, multimodal knowledge bases.
+* 🤝 **Intelligent Collaboration**: Build and orchestrate powerful multi-agent systems.
+* 🗄️ **AI-Native Database**: Manage the full lifecycle of your multimodal data with a purpose-built AI database.
+
+<p align="center">
+  <a href="https://adp.originhub.tech/login">
+    <img src="./static/images/ADP.jpg" alt="ADP Platform Interface" width="75%">
+  </a>
+</p>
+
+#### Get Started for Free
+
+👉 **[Sign up now to claim your free compute credits!](https://adp.originhub.tech)**
 
 ### 📖 5.4 Reference Project Documentation
 
