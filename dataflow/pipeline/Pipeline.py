@@ -13,7 +13,7 @@ from dataflow.core import OPERATOR_CLASSES, LLM_SERVING_CLASSES
 import atexit
 from datetime import datetime
 from dataflow.logger import get_logger
-
+import colorsys
 class PipelineABC(ABC):
     def __init__(self):
         # list of dict, contains `OPRuntime` class and parameters for `operator.run()`
@@ -284,6 +284,77 @@ class PipelineABC(ABC):
                 f"Output:\n {output_keys_string}"
             )
 
+        def _hex_to_rgb(hex_color):
+            hex_color = hex_color.lstrip("#")
+            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+        def _rgb_to_hex(rgb):
+            return "#{:02x}{:02x}{:02x}".format(*rgb)
+
+        def _lerp_color(c1, c2, t):
+            return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+
+        def _step_to_color(step, total_steps):
+            """
+            冷淡风渐变: 灰蓝 → 灰紫 → 冷蓝
+            """
+            # start = _hex_to_rgb("#bfdefc")  # 浅钢蓝
+            # mid   = _hex_to_rgb("#aaa1d3")  # 灰紫
+            # end   = _hex_to_rgb("#888794")  # 冷蓝灰
+            # start = _hex_to_rgb("#FCF1D0")  # 浅钢蓝
+            # mid   = _hex_to_rgb("#DBFFDD")  # 灰紫
+            # end   = _hex_to_rgb("#C8E0F9")  # 冷蓝灰
+            start = _hex_to_rgb("#D5B4EC")  # 浅钢蓝
+            mid   = _hex_to_rgb("#879DF8")  # 灰紫
+            end   = _hex_to_rgb("#81CDF9")  # 冷蓝灰
+
+            if total_steps <= 1:
+                return _rgb_to_hex(start)
+            
+            mid_point = (total_steps - 1) / 2
+            if step <= mid_point:
+                t = step / mid_point
+                rgb = _lerp_color(start, mid, t)
+            else:
+                t = (step - mid_point) / mid_point
+                rgb = _lerp_color(mid, end, t)
+            
+            return _rgb_to_hex(rgb)
+        
+        # def _step_to_color(step, total_steps):
+        #     # 红色 (255, 0, 0) → 蓝色 (0, 0, 255)
+        #     r_start, g_start, b_start = (255, 0, 0)
+        #     r_end, g_end, b_end = (0, 0, 255)
+        #     t = step / max(total_steps - 1, 1)  # 归一化到 [0, 1]
+        #     r = int(r_start + (r_end - r_start) * t)
+        #     g = int(g_start + (g_end - g_start) * t)
+        #     b = int(b_start + (b_end - b_start) * t)
+        #     return f"#{r:02x}{g:02x}{b:02x}"
+
+        # def _step_to_color(step, total_steps):
+        #     """
+        #     从红 → 紫 → 蓝的平滑渐变
+        #     """
+        #     if total_steps <= 1:
+        #         return "#ff0000"  # 只有一个节点时直接红色
+            
+        #     mid_point = (total_steps - 1) / 2
+        #     if step <= mid_point:
+        #         # 红(0°) → 紫(300°)
+        #         h_start, h_end = 0 / 360, 300 / 360
+        #         t = step / mid_point
+        #     else:
+        #         # 紫(300°) → 蓝(240°)
+        #         h_start, h_end = 300 / 360, 240 / 360
+        #         t = (step - mid_point) / mid_point
+            
+        #     # 饱和度和亮度固定高值
+        #     s, l = 1.0, 0.5
+        #     h = h_start + (h_end - h_start) * t
+        #     r, g, b = colorsys.hls_to_rgb(h, l, s)
+            
+        #     return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+
         # 生成 PyVis 图
         net = Network(height="800px", width="100%", directed=True)
         net.force_atlas_2based()
@@ -303,11 +374,12 @@ class PipelineABC(ABC):
 
 
         for idx, op_node in enumerate(self.op_nodes_list):
+            node_color = _step_to_color(idx, len(self.op_nodes_list))
             net.add_node(
                 n_id=id(op_node),
                 label=_get_op_node_str(op_node, step=idx),
                 title=_get_op_node_title(op_node),
-                color="lightblue",
+                color=node_color,
                 shape="box"
             )
 
