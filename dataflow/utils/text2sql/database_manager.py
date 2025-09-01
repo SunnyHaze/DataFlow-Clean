@@ -31,9 +31,8 @@ class CacheManager:
         """Get value from cache"""
         key = self._make_key(*args)
         with self._lock:
-            # Periodic cleanup
             current_time = time.time()
-            if current_time - self._last_cleanup > 300:  # 5 minutes
+            if current_time - self._last_cleanup > 300:  
                 self._cleanup_expired()
                 self._last_cleanup = current_time
             

@@ -76,7 +76,6 @@ class SQLiteConnector(DatabaseConnectorABC):
             'insert_statement': []
         }
         
-        # 获取列信息
         result = self.execute_query(connection, "PRAGMA table_info(?)", (table_name,))
         if result.success:
             for col in result.data:
@@ -97,7 +96,6 @@ class SQLiteConnector(DatabaseConnectorABC):
                 if col['pk']:
                     table_info['primary_keys'].append(col_name)
         
-        # 获取外键信息
         result = self.execute_query(connection, "PRAGMA foreign_key_list(?)", (table_name,))
         if result.success:
             for fk in result.data:
@@ -107,13 +105,11 @@ class SQLiteConnector(DatabaseConnectorABC):
                     'referenced_column': fk['to']
                 })
         
-        # 获取示例数据
         result = self.execute_query(connection, f"SELECT * FROM `{table_name}` LIMIT 2")
         if result.success and result.data:
             table_info['sample_data'] = result.data
             column_names = list(result.data[0].keys())
             
-            # 生成INSERT语句
             for row in result.data:
                 values = []
                 for value in row.values():
@@ -129,7 +125,6 @@ class SQLiteConnector(DatabaseConnectorABC):
                     f"INSERT INTO `{table_name}` ({', '.join(column_names)}) VALUES ({', '.join(values)});"
                 )
 
-        # 获取创建语句
         result = self.execute_query(connection, 
             "SELECT sql FROM sqlite_master WHERE type='table' AND name = ?", 
             (table_name,))
@@ -143,7 +138,6 @@ class SQLiteConnector(DatabaseConnectorABC):
         db_details = []
         
         for table_name, table_info in schema['tables'].items():
-            # Prepare column definitions
             column_defs = []
             for col_name, col_info in table_info['columns'].items():
                 col_def = f"    `{col_name}` {col_info['type']}"
@@ -156,15 +150,12 @@ class SQLiteConnector(DatabaseConnectorABC):
                     
                 column_defs.append(col_def)
             
-            # Prepare constraints
             constraints = []
             
-            # Primary keys
             if table_info['primary_keys']:
                 pk_cols = ", ".join(f"`{col}`" for col in table_info['primary_keys'])
                 constraints.append(f"    PRIMARY KEY ({pk_cols})")
             
-            # Foreign keys
             for i, fk in enumerate(table_info['foreign_keys']):
                 constraints.append(
                     f"    CONSTRAINT fk_{table_name}_{fk['column']}_{i} "
@@ -172,12 +163,10 @@ class SQLiteConnector(DatabaseConnectorABC):
                     f"REFERENCES `{fk['referenced_table']}` (`{fk['referenced_column']}`)"
                 )
             
-            # Build CREATE TABLE statement
             create_table = f"CREATE TABLE `{table_name}` (\n"
             create_table += ",\n".join(column_defs + constraints)
             create_table += "\n);"
             
-            # Add sample data
             if table_info['sample_data']:
                 create_table += "\n\n-- Sample data:\n"
                 create_table += "\n".join(table_info['insert_statement'])
