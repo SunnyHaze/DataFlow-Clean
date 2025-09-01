@@ -731,10 +731,9 @@ class Text2SQLPromptGeneratorPrompt:
     def __init__(self):
         pass
 
-    def build_prompt(self, create_statements: List[str], question: str, evidence: str, db_engine: str) -> str:
-        schema_str = "\n\n".join(create_statements)
+    def build_prompt(self, db_details: str, question: str, evidence: str, db_engine: str) -> str:
         if evidence:
-            question_and_evidence = f"{question}\n\n{evidence}"
+            question_and_evidence = f"{evidence}\n{question}"
         else:
             question_and_evidence = question
             
@@ -745,7 +744,7 @@ Database Engine:
 {db_engine}
 
 Database Schema:
-{schema_str}
+{db_details}
 This schema describes the database's structure, including tables, columns, primary keys, foreign keys, and any relevant relationships or constraints.
 
 Question:
@@ -765,5 +764,5 @@ sql
 Take a deep breath and think step by step to find the correct SQL query.
         """
 
-        prompt = template.format(schema_str=schema_str, question_and_evidence=question_and_evidence, db_engine=db_engine)
+        prompt = template.format(db_details=db_details, question_and_evidence=question_and_evidence, db_engine=db_engine)
         return prompt

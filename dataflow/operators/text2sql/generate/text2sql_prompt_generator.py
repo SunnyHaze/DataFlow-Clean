@@ -87,10 +87,9 @@ class Text2SQLPromptGenerator(OperatorABC):
                 
             db_id = re.sub(r'[^A-Za-z0-9_]', '', str(db_id).replace('\n', ''))
 
-            create_statements, insert_statements = self.get_create_statements_and_insert_statements(db_id)
+            db_details = self.database_manager.get_db_details(db_id)
             prompt = self.prompt_template.build_prompt(
-                create_statements=create_statements, 
-                insert_statements=insert_statements, 
+                db_details=db_details, 
                 question=question,
                 evidence=evidence,
                 db_engine=self.database_manager.db_type

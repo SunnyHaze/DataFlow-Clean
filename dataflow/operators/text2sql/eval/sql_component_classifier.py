@@ -697,7 +697,6 @@ class SQLComponentClassifier(OperatorABC):
         difficulty_thresholds: list,
         difficulty_labels: list
     ):
-        
         self.difficulty_config = {
             'thresholds': difficulty_thresholds,
             'labels': difficulty_labels
