@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 import threading
@@ -20,6 +20,7 @@ class CacheManager:
         self._cache = {}
         self._timestamps = {}
         self._lock = threading.RLock()
+        self._last_cleanup = time.time() 
     
     def _make_key(self, *args) -> str:
         """Generate cache key from arguments"""
@@ -30,8 +31,14 @@ class CacheManager:
         """Get value from cache"""
         key = self._make_key(*args)
         with self._lock:
+            # Periodic cleanup
+            current_time = time.time()
+            if current_time - self._last_cleanup > 300:  # 5 minutes
+                self._cleanup_expired()
+                self._last_cleanup = current_time
+            
             if key in self._cache:
-                if time.time() - self._timestamps[key] < self.ttl:
+                if current_time - self._timestamps[key] < self.ttl:
                     return self._cache[key]
                 else:
                     del self._cache[key]
@@ -57,6 +64,17 @@ class CacheManager:
         with self._lock:
             self._cache.clear()
             self._timestamps.clear()
+    
+    def _cleanup_expired(self):
+        """Clean up expired cache entries"""
+        current_time = time.time()
+        expired_keys = [
+            key for key, timestamp in self._timestamps.items()
+            if current_time - timestamp >= self.ttl
+        ]
+        for key in expired_keys:
+            del self._cache[key]
+            del self._timestamps[key]
 
 
 
@@ -93,6 +111,20 @@ class DatabaseManager:
         
         self._discover_databases()
 
+    def __del__(self):
+        """Clean up resources when object is destroyed"""
+        try:
+            self.close()
+        except Exception:
+            pass  # Ignore errors during cleanup
+
+    def close(self):
+        """Close all connections and clear cache"""
+        if hasattr(self, 'cache'):
+            self.cache.clear()
+        if hasattr(self, 'databases'):
+            self.databases.clear()
+
 
     # ============== Database Discovery ==============
 
@@ -105,7 +137,6 @@ class DatabaseManager:
     
     @contextmanager
     def get_connection(self, db_id: str):
-        """Get database connection context manager"""
         if db_id not in self.databases:
             raise ValueError(f"Database '{db_id}' not found")
         
@@ -126,57 +157,23 @@ class DatabaseManager:
     # ============== SQL Execution ==============
 
     def execute_query(self, db_id: str, sql: str, params: Optional[Tuple] = None) -> QueryResult:
-        """Execute SQL query on specified database with timeout"""
+        """带超时控制的查询执行"""
         if not sql or not sql.strip():
-            return QueryResult(
-                success=False,
-                error="Query cannot be empty"
-            )
-        
-        result_holder = [None]
-        exception_holder = [None]
-        
-        def execute_with_connection():
+            return QueryResult(success=False, error="Query cannot be empty")
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(self._execute_query_sync, db_id, sql, params)
             try:
-                with self.get_connection(db_id) as conn:
-                    result_holder[0] = self.connector.execute_query(conn, sql, params)
-            except Exception as e:
-                exception_holder[0] = e
-        
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(execute_with_connection)
-        
+                return future.result(timeout=self.query_timeout)
+            except TimeoutError:
+                return QueryResult(success=False, error=f"Query timeout after {self.query_timeout}s")
+
+    def _execute_query_sync(self, db_id: str, sql: str, params: Optional[Tuple] = None) -> QueryResult:
         try:
-            future.result(timeout=self.query_timeout)
-            
-            if exception_holder[0]:
-                raise exception_holder[0]
-            
-            return result_holder[0] if result_holder[0] else QueryResult(
-                success=False,
-                error="Query execution failed without specific error"
-            )
-            
-        except TimeoutError:
-            future.cancel()  
-            executor.shutdown(wait=False)
-            return QueryResult(
-                success=False,
-                error=f"Query execution timeout after {self.query_timeout} seconds"
-            )
-        except ValueError as e:
-            return QueryResult(
-                success=False,
-                error=str(e)
-            )
+            with self.get_connection(db_id) as conn:
+                return self.connector.execute_query(conn, sql, params)
         except Exception as e:
-            self.logger.error(f"Unexpected error in execute_query: {e}")
-            return QueryResult(
-                success=False,
-                error=f"Unexpected error: {str(e)}"
-            )
-        finally:
-            executor.shutdown(wait=False)
+            return QueryResult(success=False, error=str(e))
     
     def batch_compare_queries(self, query_triples: List[Tuple[str, str, str]]) -> List[Dict[str, Any]]:
         """
@@ -200,9 +197,7 @@ class DatabaseManager:
             query_indices.extend([idx, idx])
         
         # Batch execute all queries
-        db_ids = [item[0] for item in all_queries]
-        sqls = [item[1] for item in all_queries]
-        all_results = self.batch_execute_queries(db_ids, sqls)
+        all_results = self.batch_execute_queries(all_queries)
         
         # Group results by comparison pairs
         comparisons = []
@@ -227,44 +222,24 @@ class DatabaseManager:
         return comparisons
 
 
-    def batch_execute_queries(self, query_triples: List[Tuple[str, str]]) -> List[QueryResult]:
-        """
-        Compare multiple pairs of queries across different databases in parallel.
-        """
-        for db_id in set(db_id for db_id, _ in query_triples):
-            if not self.database_exists(db_id):
-                error_msg = f"Database '{db_id}' not found"
-                return [QueryResult(success=False, error=error_msg) for _ in query_triples]
+    def batch_execute_queries(self, queries: List[Tuple[str, str]]) -> List[QueryResult]:
+        results = [QueryResult(success=False, error="Not executed") for _ in queries]
+        completed_indices = set()
         
-        results = [None] * len(query_triples)
-        
-        def execute_single(idx: int, db_id: str, query_item: Union[str, Tuple[str, Tuple]]):
+        def execute_single(idx: int, db_id: str, sql: str):
             try:
-                if isinstance(query_item, tuple):
-                    sql, params = query_item
-                else:
-                    sql, params = query_item, None
-                
-                if not sql or not sql.strip():
-                    results[idx] = QueryResult(
-                        success=False,
-                        error="Query cannot be empty"
-                    )
-                    return
-                
-                result = self.execute_query(db_id, sql, params)
-                results[idx] = result
-                
+                with self.get_connection(db_id) as conn:
+                    result = self.connector.execute_query(conn, sql)
+                    results[idx] = result
+                    completed_indices.add(idx)
             except Exception as e:
-                results[idx] = QueryResult(
-                    success=False,
-                    error=f"Error: {str(e)}"
-                )
+                results[idx] = QueryResult(success=False, error=str(e))
+                completed_indices.add(idx)
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = []
-            for idx, (db_id, query_item) in enumerate(query_triples):
-                future = executor.submit(execute_single, idx, db_id, query_item)
+            for idx, (db_id, sql) in enumerate(queries):
+                future = executor.submit(execute_single, idx, db_id, sql)
                 futures.append(future)
             
             for future in as_completed(futures):
@@ -272,6 +247,9 @@ class DatabaseManager:
                     future.result()
                 except Exception as e:
                     self.logger.error(f"Batch execution error: {e}")
+
+        if len(completed_indices) != len(queries):
+            self.logger.warning(f"Some queries were not completed: {len(queries) - len(completed_indices)} missing")
         
         return results
 
@@ -337,7 +315,7 @@ class DatabaseManager:
     # In our application case, only create_statements and insert_statements are needed
     # You can add more schema generation methods here if needed
     
-    def get_schema(self, db_id: str) -> Dict[str, Any]:
+    def _get_schema(self, db_id: str) -> Dict[str, Any]:
         schema_cache = self.cache.get('schema', db_id)
         if schema_cache:
             return schema_cache
@@ -347,22 +325,30 @@ class DatabaseManager:
             self.cache.set(schema, 'schema', db_id)
             return schema
 
-    def get_create_statements(self, schema: Dict[str, Any]) -> List[str]:
+    def _get_create_statements(self, schema: Dict[str, Any]) -> List[str]:
         create_statement_list = [table_info['create_statement'] for table_info in schema['tables'].values()]
         return create_statement_list
 
-    def get_insert_statements(self, schema: Dict[str, Any]) -> List[str]:
-        insert_statement_list = [table_info['insert_statement'] for table_info in schema['tables'].values()]
+    def _get_insert_statements(self, schema: Dict[str, Any]) -> List[str]:
+        insert_statement_list = []
+        for table_info in schema['tables'].values():
+            insert_statement_list.extend(table_info['insert_statement'])
         return insert_statement_list
 
     def get_create_statements_and_insert_statements(self, db_id: str) -> tuple:
         if not self.database_exists(db_id):
             raise ValueError(f"Database '{db_id}' not found")
 
-        schema = self.get_schema(db_id)
-        create_statements = self.get_create_statements(schema)
-        insert_statements = self.get_insert_statements(schema)
+        schema = self._get_schema(db_id)
+        create_statements = self._get_create_statements(schema)
+        insert_statements = self._get_insert_statements(schema)
         return (create_statements, insert_statements)
+
+    def get_db_details(self, db_id: str) -> str:
+        if not self.database_exists(db_id):
+            raise ValueError(f"Database '{db_id}' not found")
+        schema = self._get_schema(db_id)
+        return schema['db_details']
 
 
     # ============== Utility Methods ==============

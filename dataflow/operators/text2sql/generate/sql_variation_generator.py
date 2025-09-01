@@ -88,19 +88,13 @@ class SQLVariationGenerator(OperatorABC):
         for row_idx, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Generating SQL Variations"):
             try:
                 create_statements, insert_statements = self.get_create_statements_and_insert_statements(row[self.input_db_id_key])
-                table_names = self.database_manager.get_table_names(row[self.input_db_id_key])
-                
                 original_sql = row[self.input_sql_key]
 
                 for _ in range(self.num_variations):
-                    insert_statements = []
-                    for table_name in table_names:
-                        insert_statements.extend(insert_statements.get(table_name, []))
-                    
                     prompt = self.prompt_template.build_prompt(
                         original_sql=original_sql,
-                        schema_str="\n\n".join(create_statements),
-                        db_value_prompt=insert_statements,
+                        create_statements=create_statements,
+                        insert_statements=insert_statements,
                         db_engine=self.database_manager.db_type
                     )
                     
@@ -124,14 +118,11 @@ class SQLVariationGenerator(OperatorABC):
                         original_row_idx = original_row_indices[i]
                         original_row = dataframe.iloc[original_row_idx]
 
-                        # 新建全 None 的新行
                         new_row = {col: None for col in dataframe.columns}
 
-                        # 设置 db_id 和 sql
                         new_row[self.input_db_id_key] = db_id
                         new_row[self.input_sql_key] = sql
 
-                        # 处理保留字段
                         for sys_field in RESERVED_SYS_FIELD_LIST:
                             sys_col = f"{SYS_FIELD_PREFIX}{sys_field}"
                             if sys_col in dataframe.columns and sys_col in original_row:
@@ -141,7 +132,6 @@ class SQLVariationGenerator(OperatorABC):
                             if user_col in dataframe.columns and user_col in original_row:
                                 new_row[user_col] = original_row[user_col]
 
-                        # 将新行添加到dataframe中
                         dataframe = pd.concat([dataframe, pd.DataFrame([new_row])], ignore_index=True)
 
             except Exception as e:

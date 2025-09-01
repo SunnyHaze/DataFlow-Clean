@@ -1,7 +1,6 @@
 import os
 from dataflow import get_logger
 import zipfile
-from pathlib import Path
 from huggingface_hub import snapshot_download
 
 from dataflow.operators.text2sql import (
@@ -30,31 +29,32 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 def download_and_extract_database(logger):
     dataset_repo_id = "Open-Dataflow/dataflow-Text2SQL-database-example"
-    subfolder = "databases"
     local_dir = "./hf_cache"
     extract_to = "./downloaded_databases"
+    
     logger.info(f"Downloading and extracting database from {dataset_repo_id}...")
     os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-    snapshot_download(
+    
+    os.makedirs(local_dir, exist_ok=True)
+    os.makedirs(extract_to, exist_ok=True)
+    
+    downloaded_path = snapshot_download(
         repo_id=dataset_repo_id,
         repo_type="dataset",
-        allow_patterns=f"{subfolder}/*",  
         local_dir=local_dir,
-        resume_download=True  
+        resume_download=True
     )
-    logger.info(f"Database files downloaded to {local_dir}/{subfolder}")
-
-    zip_path = Path(local_dir) / subfolder / "databases.zip"
-    extract_path = Path(extract_to)
-
-    if zip_path.exists():
+    
+    logger.info(f"Files downloaded to: {downloaded_path}")
+    
+    zip_path = os.path.join(downloaded_path, "databases.zip")
+    if os.path.exists(zip_path):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_path)
-        logger.info(f"Database files extracted to {extract_path}")
-        return str(extract_path) 
+            zip_ref.extractall(extract_to)
+        logger.info(f"Database files extracted to {extract_to}")
+        return extract_to
     else:
-        raise FileNotFoundError(f"Database files not found in {zip_path}")
-
+        raise FileNotFoundError(f"Database zip file not found at {zip_path}")
 
 class Text2SQLGeneration_APIPipeline():
     def __init__(self, db_root_path=""):
@@ -119,16 +119,13 @@ class Text2SQLGeneration_APIPipeline():
             db_type="sqlite",
             config={
                 "root_path": self.db_root_path
-            },
-            logger=None,
-            max_connections_per_db=100,
-            max_workers=100
+            }
         )
         
         self.sql_generator_step1 = SQLGenerator(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            generate_num=10,
+            generate_num=50,
             prompt_template=SelectSQLGeneratorPrompt()
         )
 
