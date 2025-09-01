@@ -74,10 +74,15 @@ class DatabaseManager:
         # 'postgres': PostgresConnector
     }
     
-    def __init__(self, db_type: str = "sqlite", config: Optional[Dict] = None):
+    def __init__(self, db_type: str = "sqlite", config: Optional[Dict] = None, 
+             logger=None, max_connections_per_db: int = 100, 
+             max_workers: int = None, sql_execution_timeout: int = 5):
         self.db_type = db_type.lower()
         self.config = config or {}
-        self.logger = get_logger()
+        self.logger = logger or get_logger()
+        self.max_connections_per_db = max_connections_per_db
+        self.max_workers = max_workers or min(64, max(32, os.cpu_count()))
+        self.query_timeout = sql_execution_timeout
         
         if self.db_type not in self.CONNECTORS:
             raise ValueError(f"Unsupported database type: {self.db_type}")
@@ -85,8 +90,6 @@ class DatabaseManager:
         self.connector = self.CONNECTORS[self.db_type]()
         self.databases = {}
         self.cache = CacheManager()
-        self.max_workers = min(64, max(32, os.cpu_count()))
-        self.query_timeout = 5
         
         self._discover_databases()
 
@@ -178,12 +181,6 @@ class DatabaseManager:
     def batch_compare_queries(self, query_triples: List[Tuple[str, str, str]]) -> List[Dict[str, Any]]:
         """
         Compare multiple pairs of queries across different databases in parallel.
-        
-        Args:
-            query_triples: List of (db_id, gold_sql, pred_sql) tuples to compare
-        
-        Returns:
-            List of comparison results
         """
         unique_db_ids = set(db_id for db_id, _, _ in query_triples)
         for db_id in unique_db_ids:
@@ -233,12 +230,6 @@ class DatabaseManager:
     def batch_execute_queries(self, query_triples: List[Tuple[str, str]]) -> List[QueryResult]:
         """
         Compare multiple pairs of queries across different databases in parallel.
-        
-        Args:
-            query_triples: List of (db_id, sql) tuples to compare
-        
-        Returns:
-            List of comparison results
         """
         for db_id in set(db_id for db_id, _ in query_triples):
             if not self.database_exists(db_id):
@@ -397,3 +388,12 @@ class DatabaseManager:
         """Get information about a specific table"""
         schema = self.get_schema(db_id)
         return schema.get('tables', {}).get(table_name)
+
+    def _create_error_result(self, error_msg: str) -> Dict[str, Any]:
+        """Create standardized error result"""
+        return {
+            'equal': False,
+            'differences': [error_msg],
+            'result1_success': False,
+            'result2_success': False,
+        }
