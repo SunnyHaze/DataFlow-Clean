@@ -57,12 +57,11 @@ def download_and_extract_database(logger):
 
 
 class Text2SQLGeneration_APIPipeline():
-    def __init__(self, auto_download_db=False):
-
+    def __init__(self, db_root_path=""):
         self.logger = get_logger()
-        self.db_root_path = "" 
+        self.db_root_path = db_root_path
 
-        if auto_download_db:
+        if not db_root_path:
             try:
                 self.db_root_path = download_and_extract_database(self.logger)
                 self.logger.info(f"Using automatically downloaded database at: {self.db_root_path}")
@@ -70,15 +69,10 @@ class Text2SQLGeneration_APIPipeline():
                 self.logger.error(f"Failed to auto-download database: {e}")
                 raise 
         else:
-             if not self.db_root_path:
-                self.logger.error(
-                    "Auto-download is disabled and 'db_root_path' is not set. "
-                    "Please manually assign the path to the database files to 'self.db_root_path' "
-                    "before initializing the DatabaseManager, or set auto_download_db=True."
-                )
-                raise ValueError("Database path is not specified, please specify the database path manually.")
-             else:
-                 self.logger.info(f"Using manually specified database path: {self.db_root_path}")
+            self.logger.info(f"Using manually specified database path: {self.db_root_path}")
+
+        if not os.path.exists(self.db_root_path):
+            raise FileNotFoundError(f"Database path does not exist: {self.db_root_path}")
 
         self.storage = FileStorage(
             first_entry_file_name="",
@@ -231,6 +225,10 @@ class Text2SQLGeneration_APIPipeline():
         )
 
 if __name__ == "__main__":
-    model = Text2SQLGeneration_APIPipeline(auto_download_db=True)
+    # If you have your own database files, you can set the db_root_path to the path of your database files
+    # If not, please set the db_root_path "", and we will download the example database files automatically
+    db_root_path = ""
+
+    model = Text2SQLGeneration_APIPipeline(db_root_path=db_root_path)
     model.forward()
 
