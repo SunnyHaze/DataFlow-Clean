@@ -81,7 +81,8 @@ class SQLExecutionFilter(OperatorABC):
 
         db_ids = dataframe[input_db_id_key]
         sql_list = dataframe[input_sql_key]
-        execution_results = self.database_manager.batch_execute_queries(db_ids, sql_list)
+        sql_triples = [(db_id, sql) for db_id, sql in zip(db_ids, sql_list)]
+        execution_results = self.database_manager.batch_execute_queries(sql_triples)
 
         final_indices = []
         for idx, exec_result in enumerate(execution_results):

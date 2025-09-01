@@ -221,38 +221,35 @@ class DatabaseManager:
         
         return comparisons
 
-
     def batch_execute_queries(self, queries: List[Tuple[str, str]]) -> List[QueryResult]:
         results = [QueryResult(success=False, error="Not executed") for _ in queries]
-        completed_indices = set()
-        
-        def execute_single(idx: int, db_id: str, sql: str):
-            try:
-                with self.get_connection(db_id) as conn:
-                    result = self.connector.execute_query(conn, sql)
-                    results[idx] = result
-                    completed_indices.add(idx)
-            except Exception as e:
-                results[idx] = QueryResult(success=False, error=str(e))
-                completed_indices.add(idx)
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = []
-            for idx, (db_id, sql) in enumerate(queries):
-                future = executor.submit(execute_single, idx, db_id, sql)
-                futures.append(future)
+            futures = {}
+            semaphore = threading.Semaphore(self.max_connections_per_db)
             
-            for future in as_completed(futures):
-                try:
+            def execute_with_limit(idx, db_id, sql):
+                with semaphore:
+                    try:
+                        with self.get_connection(db_id) as conn:
+                            result = self.connector.execute_query(conn, sql)
+                            results[idx] = result
+                    except Exception as e:
+                        results[idx] = QueryResult(
+                            success=False, 
+                            error=f"{type(e).__name__}: {str(e)}"
+                        )
+            
+            for idx, (db_id, sql) in enumerate(queries):
+                futures[executor.submit(execute_with_limit, idx, db_id, sql)] = idx
+            
+            try:
+                for future in as_completed(futures, timeout=self.query_timeout*len(queries)):
                     future.result()
-                except Exception as e:
-                    self.logger.error(f"Batch execution error: {e}")
-
-        if len(completed_indices) != len(queries):
-            self.logger.warning(f"Some queries were not completed: {len(queries) - len(completed_indices)} missing")
+            except TimeoutError:
+                self.logger.warning("Batch execution timed out")
         
         return results
-
 
     def compare_queries(self, db_id: str, sql1: str, sql2: str) -> Dict[str, Any]:
         """Compare results of two SQL queries"""

@@ -12,7 +12,7 @@ class SQLConsistencyFilterPrompt:
     def __init__(self):
         pass
 
-    def build_prompt(self, question: str, sql: str, schema: str) -> str:
+    def build_prompt(self, question: str, sql: str, db_details: str) -> str:
         prompt = f"""
         **Task Overview**
         Determine if the SQL query correctly answers the given question based on the provided schema.
@@ -24,7 +24,7 @@ class SQLConsistencyFilterPrompt:
         {sql}
 
         **Schema**
-        {schema}
+        {db_details}
 
         **Evaluation Criteria**
         1. **Logical Alignment**: Does the SQL query logically address what the question is asking?
@@ -52,7 +52,7 @@ class Text2SQLCotGeneratorPrompt:
     def __init__(self):
         pass
 
-    def build_prompt(self, schema: str, question: str, sql: str) -> str:
+    def build_prompt(self, db_details: str, question: str, sql: str) -> str:
         prompt = f"""
         You are a senior data analyst specializing in SQL. Your task is to translate a natural language question into an executable SQLite query, providing a detailed reasoning trace.
 
@@ -69,7 +69,7 @@ class Text2SQLCotGeneratorPrompt:
         ```
 
         [Database Schema]:
-        {schema}
+        {db_details}
 
         [Natural Language Question]:
         {question}
