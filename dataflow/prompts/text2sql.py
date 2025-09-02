@@ -1,11 +1,18 @@
 '''
 A collection of prompts for the text2sql operator.
 '''
-class TextSQLConsistencyPrompt:
+import random
+from re import template
+import numpy as np
+import json
+from typing import List
+
+
+class SQLConsistencyFilterPrompt:
     def __init__(self):
         pass
 
-    def text_sql_consistency_prompt(self, question, sql, schema):
+    def build_prompt(self, question: str, sql: str, db_details: str) -> str:
         prompt = f"""
         **Task Overview**
         Determine if the SQL query correctly answers the given question based on the provided schema.
@@ -17,7 +24,7 @@ class TextSQLConsistencyPrompt:
         {sql}
 
         **Schema**
-        {schema}
+        {db_details}
 
         **Evaluation Criteria**
         1. **Logical Alignment**: Does the SQL query logically address what the question is asking?
@@ -41,11 +48,11 @@ class TextSQLConsistencyPrompt:
         """
         return prompt
 
-class CotGenerationPrompt:
+class Text2SQLCotGeneratorPrompt:
     def __init__(self):
         pass
 
-    def text2sql_cot_prompt(self, schema, question, sql):
+    def build_prompt(self, db_details: str, question: str, sql: str) -> str:
         prompt = f"""
         You are a senior data analyst specializing in SQL. Your task is to translate a natural language question into an executable SQLite query, providing a detailed reasoning trace.
 
@@ -62,7 +69,7 @@ class CotGenerationPrompt:
         ```
 
         [Database Schema]:
-        {schema}
+        {db_details}
 
         [Natural Language Question]:
         {question}
@@ -77,7 +84,7 @@ class CotGenerationPrompt:
         return prompt
 
 
-class SQLGenerationPrompt:
+class SelectSQLGeneratorPrompt:
     def __init__(self):
         self.simple_criterion = '''**Criteria:**
         Simple SQL queries may satisfy one or more of the following criteria:
@@ -179,65 +186,14 @@ class SQLGenerationPrompt:
         INNER JOIN DepartmentStats dstat ON ds.department_id = dstat.department_id
         ORDER BY ds.level, ds.name;
         ```'''
+        self.complexity2criterion = {
+            "Simple": self.simple_criterion,
+            "Moderate": self.moderate_criterion,
+            "Complex": self.complex_criterion, 
+            "Highly Complex": self.highly_complex_criterion
+        }
 
-    def sql_func_template(self, sql_funcs):
-        template = """### SQL Functions
-        You may consider one or more of the following SQL functions while generating the query:
-        {sql_funcs}
-        Important tips:
-        Except for the functions listed above, you may use any other functions as long as they conform to the syntax of the database engine.
-        """
-        return template.format(sql_funcs=sql_funcs)
-
-    def insert_stmts_template(self, insert_statements):
-        template = '''### INSERT INTO Statements
-        Below are several `INSERT INTO` statements. Use these to help generate predicates (i.e., `WHERE` clauses) in your SQL query:
-        {insert_statements}
-        '''
-        return template.format(insert_statements=insert_statements)
-
-    def sql_synthesis_prompt(self, schema_str, sql_function_prompt, db_value_prompt, complexity, criterion, db_engine, column_count):
-        template = '''**Task Overview**
-        Create an executable SQL query based on the provided information.
-
-        **Database Schema**
-        {schema_str}
-
-        {sql_function_prompt}
-
-        {db_value_prompt}
-
-        **SQL Query Complexity**
-        Ensure the SQL query matches the {complexity} level, defined as follows:
-        {criterion}
-
-        **Output Format Requirements**
-        Enclose the SQL query in a code block:
-        ```sql
-        -- Your SQL query here
-        ```
-
-        **SQL Query Requirements**
-        1. Use the syntax specific to the {db_engine} database engine.
-        2. Incorporate advanced functions if appropriate, but they are not mandatory.
-        3. Address real-world data analysis needs. Avoid trivial or nonsensical queries.
-        4. (Very important) Ensure the final SQL query selects {column_count} columns.
-
-        **Answer**
-        Let's proceed step by step.
-        '''
-        return template.format(
-            schema_str=schema_str,
-            sql_function_prompt=sql_function_prompt.strip(),
-            db_value_prompt=db_value_prompt.strip(),
-            complexity=complexity,
-            criterion=criterion.strip(),
-            db_engine=db_engine,
-            column_count=column_count
-        )
-    
-    def sqlite_funcs(self):
-        funcs = [
+        self.functions = [
             "ABS(X) \nDescription: The ABS(X) function returns the absolute value of the numeric argument X. Abs(X) returns NULL if X is NULL. Abs(X) returns 0.0 if X is a string or blob that cannot be converted to a numeric value. If X is the integer -9223372036854775808 then ABS(X) throws an integer overflow error since there is no equivalent positive 64-bit two complement value. ",
             "CHANGES() \nDescription: The CHANGES() function returns the number of database rows that were changed or inserted or deleted by the most recently completed INSERT, DELETE, or UPDATE statement, exclusive of statements in lower-level triggers. The CHANGES() SQL function is a wrapper around thesqlite3_changes64()C/C++ function and hence follows the same rules for counting changes. ",
             "CHAR(X1,X2,...,XN) \nDescription: The CHAR(X1,X2,...,XN) function returns a string composed of characters having the unicode code point values of integers X1 through XN, respectively. ",
@@ -336,56 +292,101 @@ class SQLGenerationPrompt:
             "STRFTIME(format, time-value, modifier, modifier, ...) \nDescription: Returns the date formatted according to the format string specified as the first argument. The format string supports the most common substitutions found in the STRFTIME() function from the standard C library plus two new substitutions, %f and %J. ",
             "TIMEDIFF(time-value, time-value) \nDescription: Returns a string that describes the amount of time that must be added to B in order to reach time A. The format of the TIMEDIFF() result is designed to be human-readable. "
         ]
-        return funcs
 
+    def sql_func_template(self, sql_funcs: str) -> str:
+        template = """### SQL Functions
+        You may consider one or more of the following SQL functions while generating the query:
+        {sql_funcs}
+        Important tips:
+        Except for the functions listed above, you may use any other functions as long as they conform to the syntax of the database engine.
+        """
+        return template.format(sql_funcs=sql_funcs)
 
-class QuestionGenerationPrompt:
-    def __init__(self):
-        pass
+    def insert_stmts_template(self, insert_statements: str) -> str:
+        template = '''### INSERT INTO Statements
+        Below are several `INSERT INTO` statements. Use these to help generate predicates (i.e., `WHERE` clauses) in your SQL query:
+        {insert_statements}
+        '''
+        return template.format(insert_statements=insert_statements)
 
-    def question_synthesis_prompt(self, style_desc, engine, column_info, sql, steps, guidelines, output_format, instruction):
+    def sql_synthesis_prompt(self, schema_str: str, sql_function_prompt: str, db_value_prompt: str, complexity: str, criterion: str, db_engine: str, column_count: int) -> str:
         template = '''**Task Overview**
-        Your task is to create a high-quality natural language question based on a given SQL query and other information.
+        Create an executable SQL query based on the provided information.
 
-        **Style**
-        The natural language question should follow this style:
-        {style_desc}
+        **Database Schema**
+        {schema_str}
 
-        **Database Engine**
-        {engine}
+        {sql_function_prompt}
 
-        **Column Information**
-        Below are column names and their corresponding descriptions:
-        {column_info}
+        {db_value_prompt}
 
-        **SQL Query**
-        Given SQL query:
+        **SQL Query Complexity**
+        Ensure the SQL query matches the {complexity} level, defined as follows:
+        {criterion}
+
+        **Output Format Requirements**
+        Enclose the SQL query in a code block:
         ```sql
-        {sql}
+        -- Your SQL query here
         ```
 
-        **Reasoning Steps**
-        {steps}
+        **SQL Query Requirements**
+        1. Use the syntax specific to the {db_engine} database engine.
+        2. Incorporate advanced functions if appropriate, but they are not mandatory.
+        3. Address real-world data analysis needs. Avoid trivial or nonsensical queries.
+        4. (Very important) Ensure the final SQL query selects {column_count} columns.
 
-        **Guidelines**
-        {guidelines}
-
-        **Output Format**
-        {output_format}
-
-        **Insturction**
-        {instruction}
+        **Answer**
+        Let's proceed step by step.
         '''
         return template.format(
-            style_desc = style_desc,
-            engine = engine,
-            column_info = column_info,
-            sql = sql,
-            steps = steps,
-            guidelines = guidelines,
-            output_format = output_format,
-            instruction = instruction
-        )  
+            schema_str=schema_str,
+            sql_function_prompt=sql_function_prompt.strip(),
+            db_value_prompt=db_value_prompt.strip(),
+            complexity=complexity,
+            criterion=criterion.strip(),
+            db_engine=db_engine,
+            column_count=column_count
+        )
+
+    def build_prompt(self, insert_statements: List[str], create_statements: List[str], db_engine: str) -> tuple[str, str]:
+        random.seed(42)
+        complexity = random.sample(["Simple", "Moderate", "Complex", "Highly Complex"], 1)[0]
+
+        if len(insert_statements) == 0:
+            db_value_prompt = ""
+        else:
+            if len(insert_statements) > 4:
+                insert_statements = random.sample(insert_statements, 4)
+            db_value_prompt = self.insert_stmts_template(
+                insert_statements="\n\n".join(insert_statements)
+            )
+
+        function_num = random.randint(0, 2)
+        if function_num == 0:
+            sql_function_prompt = "### SQL Functions\nYou can use any function supported by the database engine."
+        else:
+            sql_funcs = ""
+            sampled_functions = random.sample(self.functions, min(function_num, len(self.functions)))
+            for idx, func in enumerate(sampled_functions):
+                sql_funcs += f"Function {idx + 1}:\n{func.strip()}\n"
+            sql_function_prompt = self.sql_func_template(sql_funcs=sql_funcs)
+
+        column_count = np.random.geometric(0.6, 1)[0]
+        prompt = self.sql_synthesis_prompt(
+            schema_str="\n\n".join(create_statements),
+            sql_function_prompt=sql_function_prompt.strip(),
+            db_value_prompt=db_value_prompt.strip(),
+            complexity=complexity,
+            criterion=self.complexity2criterion[complexity].strip(),
+            db_engine=db_engine,
+            column_count=column_count
+        )
+        return prompt, complexity
+
+class Text2SQLQuestionGeneratorPrompt:
+    def __init__(self):
+        pass
 
     def get_style2desc(self):
         template = {
@@ -523,7 +524,87 @@ class QuestionGenerationPrompt:
         template = "Based on the above information, follow the reasoning steps to generate the explanation and the dialogue corresponding to the SQL query."
         return template
 
-class SQLVariationPrompt:
+    def question_synthesis_prompt(self, style_desc, engine, column_info, sql, steps, guidelines, output_format, instruction):
+
+
+        template = '''**Task Overview**
+        Your task is to create a high-quality natural language question based on a given SQL query and other information.
+
+        **Style**
+        The natural language question should follow this style:
+        {style_desc}
+
+        **Database Engine**
+        {engine}
+
+        **Column Information**
+        Below are column names and their corresponding descriptions:
+        {column_info}
+
+        **SQL Query**
+        Given SQL query:
+        ```sql
+        {sql}
+        ```
+
+        **Reasoning Steps**
+        {steps}
+
+        **Guidelines**
+        {guidelines}
+
+        **Output Format**
+        {output_format}
+
+        **Insturction**
+        {instruction}
+        '''
+        return template.format(
+            style_desc = style_desc,
+            engine = engine,
+            column_info = column_info,
+            sql = sql,
+            steps = steps,
+            guidelines = guidelines,
+            output_format = output_format,
+            instruction = instruction
+        )  
+
+    def build_prompt(self, data, input_db_id_key, input_sql_key, styles, db_id2column_info, db_type) -> str:
+        style_name = random.sample(styles, 1)[0]
+        column_name2column_desc = db_id2column_info[data[input_db_id_key]]
+        used_column_name2column_desc = dict()
+            
+        for column_name, column_desc in column_name2column_desc.items():
+            if column_name.lower() in data[input_sql_key].lower():
+                used_column_name2column_desc[column_name] = column_desc
+
+        if style_name in ["Vague", "Metaphorical"]:
+            steps = self.get_steps_w_ek()
+            guidelines = self.get_guidelines_w_ek()
+            instruction = self.get_instruction_w_ek()
+            output_format = self.get_output_format_w_ek()
+        else:
+            steps = self.get_steps_wo_ek()
+            guidelines = self.get_guidelines_wo_ek()
+            instruction = self.get_instruction_wo_ek()
+            output_format = self.get_output_format_wo_ek()
+
+        prompt = self.question_synthesis_prompt(
+            style_desc=self.get_style2desc()[style_name].strip(),
+            engine=db_type,
+            column_info=json.dumps(used_column_name2column_desc, indent=2, ensure_ascii=False).strip(),
+            sql=data[input_sql_key].strip(),
+            steps=steps.strip(),
+            guidelines=guidelines.strip(),
+            output_format=output_format.strip(),
+            instruction=instruction.strip()
+        )
+
+        return prompt, style_name
+
+
+class SQLVariationGeneratorPrompt:
     def __init__(self):
         pass
 
@@ -621,3 +702,67 @@ class SQLVariationPrompt:
             original_sql=original_sql,
             db_engine=db_engine
         )
+
+    def build_prompt(self, original_sql, create_statements, insert_statements, db_engine) -> str:
+        random.seed(42)
+        if len(insert_statements) == 0:
+            db_value_prompt = ""
+        else:
+            if len(insert_statements) > 4:
+                insert_statements = random.sample(insert_statements, 4)
+            db_value_prompt = self.insert_stmts_template(
+                insert_statements="\n\n".join(insert_statements)
+            )
+
+        variation_type = random.randint(0, 5)
+        variation_prompt = self.variation_type_prompt(variation_type=variation_type)
+                    
+        prompt = self.sql_variation_prompt(
+            original_sql=original_sql,
+            schema_str="\n\n".join(create_statements),
+            db_value_prompt=db_value_prompt.strip(),
+            variation_prompt=variation_prompt.strip(),
+            db_engine=db_engine
+        )
+        return prompt
+
+
+class Text2SQLPromptGeneratorPrompt:
+    def __init__(self):
+        pass
+
+    def build_prompt(self, db_details: str, question: str, evidence: str, db_engine: str) -> str:
+        if evidence:
+            question_and_evidence = f"{evidence}\n{question}"
+        else:
+            question_and_evidence = question
+            
+        template = """Task Overview:
+You are a data science expert. Below, you are provided with a database schema and a natural language question. Your task is to understand the schema and generate a valid SQL query to answer the question.
+
+Database Engine:
+{db_engine}
+
+Database Schema:
+{db_details}
+This schema describes the database's structure, including tables, columns, primary keys, foreign keys, and any relevant relationships or constraints.
+
+Question:
+{question_and_evidence}
+
+Instructions:
+- Make sure you only output the information that is asked in the question. If the question asks for a specific column, make sure to only include that column in the SELECT clause, nothing more.
+- The generated query should return all of the information asked in the question without any missing or extra information.
+- Before generating the final SQL query, please think through the steps of how to write the query.
+
+Output Format:
+In your answer, please enclose the generated SQL query in a code block:
+sql
+-- Your SQL query
+
+
+Take a deep breath and think step by step to find the correct SQL query.
+        """
+
+        prompt = template.format(db_details=db_details, question_and_evidence=question_and_evidence, db_engine=db_engine)
+        return prompt

@@ -54,15 +54,6 @@ class SQLConsistencyFilter(OperatorABC):
                 return True
         return False
         
-    def generate_consistency_prompt(self, question, sql, schema):
-        return self.prompt_template.build_prompt(question, sql, schema)
-
-    def get_schema_info(self, db_id: str) -> str:
-        create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(db_id)
-        create_statements_str = "\n\n".join(create_statements)
-        insert_statements_str = "\n\n".join(insert_statements)
-        return "\n\n".join([create_statements_str, insert_statements_str])
-
     def check_column(self, dataframe):
         required_columns = [self.input_sql_key, self.input_db_id_key, self.input_question_key]
         missing_columns = [col for col in required_columns if col not in dataframe.columns]
@@ -88,8 +79,8 @@ class SQLConsistencyFilter(OperatorABC):
             sql = row[self.input_sql_key]
             question = row[self.input_question_key]
             db_id = row[self.input_db_id_key]
-            ddl = self.get_schema_info(db_id)
-            prompt = self.generate_consistency_prompt(question, sql, ddl)
+            db_details = self.database_manager.get_db_details(db_id)
+            prompt = self.prompt_template.build_prompt(question, sql, db_details)
             prompts.append(prompt)
             
         responses = self.llm_serving.generate_from_input(prompts, "")

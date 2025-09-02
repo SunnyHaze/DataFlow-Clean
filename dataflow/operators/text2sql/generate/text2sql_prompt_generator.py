@@ -14,7 +14,8 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 class Text2SQLPromptGenerator(OperatorABC):
     def __init__(self, 
                 database_manager: DatabaseManager,
-                prompt_template = None
+                prompt_template = None,
+                include_evidence = True
             ):
 
         if prompt_template is None:
@@ -22,6 +23,7 @@ class Text2SQLPromptGenerator(OperatorABC):
         self.prompt_template = prompt_template
         
         self.logger = get_logger()
+        self.include_evidence = include_evidence
         self.database_manager = database_manager
 
     @staticmethod
@@ -49,49 +51,20 @@ class Text2SQLPromptGenerator(OperatorABC):
         else:
             return "Prompt generator for Text2SQL tasks."
 
-    def get_schema_info(self, db_id: str) -> str:
-        create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(db_id)
-        create_statements_str = "\n\n".join(create_statements)
-        insert_statements_str = "\n\n".join(insert_statements)
-        return "\n\n".join([create_statements_str, insert_statements_str])
-
-    def generate_prompt(self, db_id: str, question: str) -> str:
-        schema_info = self.get_schema_info(db_id)
-        return self.prompt_template.build_prompt(schema_info, question) 
-
-    def _process_item(self, item: Dict) -> Dict:
-        try:
-            db_id = item[self.input_db_id_key]
-            question = item[self.input_question_key]
-            
-            db_id = re.sub(r'[^A-Za-z0-9_]', '', str(db_id).replace('\n', ''))
-            
-            prompt = self.generate_prompt(db_id, question)
-            
-            result = {
-                **item,
-                self.output_sft_prompt_key: prompt
-            }
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Error processing item: {e}")
-            return {
-                **item,
-                self.output_sft_prompt_key: f"Error processing item: {e}",
-                '_error': str(e)
-            }
+    def get_create_statements_and_insert_statements(self, db_id: str) -> str:
+        return self.database_manager.get_create_statements_and_insert_statements(db_id)
 
     def run(self, storage: DataFlowStorage, 
             input_question_key: str = "question",
             input_db_id_key: str = "db_id",
+            input_evidence_key: str = "evidence",
             output_prompt_key: str = "prompt"
         ):
         
         self.input_question_key = input_question_key
         self.input_db_id_key = input_db_id_key
-        self.output_sft_prompt_key = output_prompt_key
+        self.input_evidence_key = input_evidence_key
+        self.output_prompt_key = output_prompt_key
 
         self.logger.info("Starting prompt generation...")
         raw_dataframe = storage.read("dataframe")
@@ -105,7 +78,27 @@ class Text2SQLPromptGenerator(OperatorABC):
         final_results = []
 
         for item in tqdm(items, desc="Generating prompts"):
-            result = self._process_item(item)
+            db_id = item[self.input_db_id_key]
+            question = item[self.input_question_key]
+            if self.include_evidence:
+                evidence = item[self.input_evidence_key]
+            else:
+                evidence = ""
+                
+            db_id = re.sub(r'[^A-Za-z0-9_]', '', str(db_id).replace('\n', ''))
+
+            db_details = self.database_manager.get_db_details(db_id)
+            prompt = self.prompt_template.build_prompt(
+                db_details=db_details, 
+                question=question,
+                evidence=evidence,
+                db_engine=self.database_manager.db_type
+            ) 
+            
+            result = {
+                **item,
+                self.output_prompt_key: prompt
+            }
             final_results.append(result)
    
         if len(final_results) != len(items):
@@ -114,4 +107,4 @@ class Text2SQLPromptGenerator(OperatorABC):
         output_file = storage.write(pd.DataFrame(final_results))
         self.logger.info(f"Prompt generation completed, saved to {output_file}")
 
-        return [self.output_sft_prompt_key]
+        return [self.output_prompt_key]

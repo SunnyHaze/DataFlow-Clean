@@ -1,38 +1,44 @@
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
+from dataflow import get_logger
 from ..base import DatabaseConnectorABC, DatabaseInfo, QueryResult
 import pymysql
 import pymysql.cursors
 import time
-import logging
+import re
 
-# ============== MySQL Connector ==============
 class MySQLConnector(DatabaseConnectorABC):
-    """MySQL database connector implementation"""
+    """MySQL database connector implementation with full schema support"""
     
     def __init__(self):
-        """Initialize MySQL connector with logger"""
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = get_logger()
     
     def connect(self, connection_info: Dict) -> pymysql.Connection:
+        """Connect to MySQL database with read-only settings"""
         config = {
             'connect_timeout': 10,
             'read_timeout': 30,
             'write_timeout': 30,
             'charset': 'utf8mb4',
-            'autocommit': False,  
             'cursorclass': pymysql.cursors.DictCursor,
-            **connection_info
+            'autocommit': True
         }
+        config.update(connection_info)
         
-        conn = pymysql.connect(**config)
-        with conn.cursor() as cursor:
-            cursor.execute("SET SESSION wait_timeout = 300")
-            cursor.execute("SET SESSION TRANSACTION READ ONLY") # read only transaction
-        return conn
+        try:
+            conn = pymysql.connect(**config)
+            with conn.cursor() as cursor:
+                cursor.execute("SET SESSION TRANSACTION READ ONLY")
+                cursor.execute("SET SESSION sql_mode = 'ANSI'")
+            return conn
+        except pymysql.Error as e:
+            self.logger.error(f"MySQL connection failed: {e}")
+            raise
     
     def execute_query(self, connection: pymysql.Connection, sql: str, params: Optional[Tuple] = None) -> QueryResult:
+        """Execute query with enhanced error handling and result processing"""
         start_time = time.time()
         cursor = None
+        
         try:
             cursor = connection.cursor()
             if params:
@@ -40,11 +46,11 @@ class MySQLConnector(DatabaseConnectorABC):
             else:
                 cursor.execute(sql)
             
-            sql_upper = sql.strip().upper()
-            if sql_upper.startswith(('SELECT', 'SHOW', 'DESCRIBE', 'EXPLAIN')):
+            # Handle different query types
+            if sql.strip().upper().startswith(('SELECT', 'SHOW', 'DESC', 'EXPLAIN')):
                 rows = cursor.fetchall()
                 columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                data = list(rows) if rows else []
+                data = [dict(zip(columns, row)) for row in rows] if columns else []
             else:
                 raise Exception("Write operations are not allowed in read-only mode")
             
@@ -52,78 +58,50 @@ class MySQLConnector(DatabaseConnectorABC):
                 success=True,
                 data=data,
                 columns=columns,
-                row_count=len(data)
+                row_count=len(data),
+                execution_time=time.time() - start_time
             )
         except Exception as e:
-            self.logger.error(f"Query execution error: {e}")
+            self.logger.error(f"Query failed: {e}\nSQL: {sql}")
             return QueryResult(
                 success=False,
-                error=str(e)
+                error=str(e),
+                execution_time=time.time() - start_time
             )
         finally:
             if cursor:
                 cursor.close()
     
     def get_schema_info(self, connection: pymysql.Connection) -> Dict[str, Any]:
-        """Get complete schema information for MySQL database"""
+        """Get complete schema information with formatted DDL"""
         schema = {'tables': {}}
         
         # Get current database
-        result = self.execute_query(connection, "SELECT DATABASE()")
-        if not result.success or not result.data:
+        db_result = self.execute_query(connection, "SELECT DATABASE() AS db")
+        if not db_result.success or not db_result.data:
             return schema
         
-        db_name = list(result.data[0].values())[0]
+        db_name = db_result.data[0]['db']
         if not db_name:
             self.logger.warning("No database selected")
             return schema
         
-        # Get all tables from the database
-        result = self.execute_query(connection, "SHOW TABLES")
-        if not result.success:
+        # Get all tables
+        tables_result = self.execute_query(connection, 
+            "SELECT TABLE_NAME FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_type = 'BASE TABLE'", 
+            (db_name,))
+        
+        if not tables_result.success:
             return schema
         
-        for row in result.data:
-            table_name = list(row.values())[0]  
+        for row in tables_result.data:
+            table_name = row['TABLE_NAME']
             table_info = self._get_table_info(connection, db_name, table_name)
             schema['tables'][table_name] = table_info
         
+        schema['db_details'] = self._get_db_details(schema)
         return schema
-
-    def generate_create_statement(self, table_name: str, table_info: Dict[str, Any]) -> str:
-        """Generate CREATE TABLE statements from schema"""
-        if table_info.get('create_statement'):
-            return table_info['create_statement']
-        
-        columns = []
-        for col_name, col_info in table_info.get('columns', {}).items():
-            col_def = f"`{col_name}` {col_info['type']}"
-            if not col_info.get('nullable', True):
-                col_def += " NOT NULL"
-            if col_info.get('default') is not None:
-                default_val = col_info['default']
-                if isinstance(default_val, str) and default_val.upper() not in ('CURRENT_TIMESTAMP', 'NULL'):
-                    col_def += f" DEFAULT '{default_val}'"
-                else:
-                    col_def += f" DEFAULT {default_val}"
-            columns.append(col_def)
-            
-        # Primary keys
-        pk_cols = table_info.get('primary_keys', [])
-        if pk_cols:
-            columns.append(f"PRIMARY KEY ({', '.join(f'`{pk}`' for pk in pk_cols)})")
-            
-        # Foreign keys
-        for fk in table_info.get('foreign_keys', []):
-            fk_def = (f"FOREIGN KEY (`{fk['column']}`) "
-                        f"REFERENCES `{fk['referenced_table']}`(`{fk['referenced_column']}`)")
-            columns.append(fk_def)
-            
-        if columns:
-            create_stmt = f"CREATE TABLE `{table_name}` (\n  " + ",\n  ".join(columns) + "\n);"
-            return create_stmt
-        
-        return ""
     
     def _get_table_info(self, connection: pymysql.Connection, db_name: str, table_name: str) -> Dict[str, Any]:
         """Get detailed table information"""
@@ -133,126 +111,194 @@ class MySQLConnector(DatabaseConnectorABC):
             'foreign_keys': [],
             'sample_data': [],
             'create_statement': None,
-            'insert_statement': None
+            'insert_statement': []
         }
         
-        # Get columns information with more detailed type info
-        query = """
-            SELECT column_name, data_type, is_nullable, column_default, column_key,
-                   character_maximum_length, numeric_precision, numeric_scale,
-                   column_type
+        # Get columns information
+        col_result = self.execute_query(connection, """
+            SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, 
+                   EXTRA, CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION
             FROM information_schema.columns
             WHERE table_schema = %s AND table_name = %s
-            ORDER BY ordinal_position
-        """
-        result = self.execute_query(connection, query, (db_name, table_name))
+            ORDER BY ORDINAL_POSITION
+        """, (db_name, table_name))
         
-        if result.success:
-            for col in result.data:
-                col_name = col['column_name']
-                col_type = col['column_type'] if col['column_type'] else col['data_type']
+        if col_result.success:
+            for col in col_result.data:
+                col_name = col['COLUMN_NAME']
+                default = col['COLUMN_DEFAULT']
+                
+                # Format default value
+                if default is not None:
+                    if isinstance(default, str) and default.upper() not in ('CURRENT_TIMESTAMP', 'NULL'):
+                        default = f"'{default}'"
+                    elif isinstance(default, bool):
+                        default = str(int(default))
                 
                 table_info['columns'][col_name] = {
-                    'type': col_type,
-                    'nullable': col['is_nullable'] == 'YES',
-                    'default': col['column_default'],
-                    'primary_key': col['column_key'] == 'PRI'
+                    'type': col['COLUMN_TYPE'],
+                    'nullable': col['IS_NULLABLE'] == 'YES',
+                    'default': default,
+                    'primary_key': col['COLUMN_KEY'] == 'PRI'
                 }
-                if col['column_key'] == 'PRI':
+                if col['COLUMN_KEY'] == 'PRI':
                     table_info['primary_keys'].append(col_name)
         
-        # Get foreign keys from the table
-        query = """
-            SELECT column_name, referenced_table_name, referenced_column_name
-            FROM information_schema.key_column_usage
-            WHERE table_schema = %s AND table_name = %s
-            AND referenced_table_name IS NOT NULL
-        """
-        result = self.execute_query(connection, query, (db_name, table_name))
+        # Get foreign keys
+        fk_result = self.execute_query(connection, """
+            SELECT 
+                kcu.COLUMN_NAME,
+                kcu.REFERENCED_TABLE_NAME,
+                kcu.REFERENCED_COLUMN_NAME,
+                rc.UPDATE_RULE,
+                rc.DELETE_RULE
+            FROM information_schema.key_column_usage kcu
+            LEFT JOIN information_schema.referential_constraints rc
+                ON rc.CONSTRAINT_SCHEMA = kcu.TABLE_SCHEMA
+                AND rc.TABLE_NAME = kcu.TABLE_NAME
+                AND rc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+            WHERE kcu.TABLE_SCHEMA = %s 
+                AND kcu.TABLE_NAME = %s
+                AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+        """, (db_name, table_name))
         
-        if result.success:
-            for fk in result.data:
+        if fk_result.success:
+            for fk in fk_result.data:
                 table_info['foreign_keys'].append({
-                    'column': fk['column_name'],
-                    'referenced_table': fk['referenced_table_name'],
-                    'referenced_column': fk['referenced_column_name']
+                    'column': fk['COLUMN_NAME'],
+                    'referenced_table': fk['REFERENCED_TABLE_NAME'],
+                    'referenced_column': fk['REFERENCED_COLUMN_NAME'],
+                    'update_rule': fk['UPDATE_RULE'],
+                    'delete_rule': fk['DELETE_RULE']
                 })
-
-        # Get sample data from the table
-        result = self.execute_query(connection, f"SELECT * FROM `{table_name}` LIMIT 100")
-        if result.success and result.data:
-            table_info['sample_data'] = result.data
-
-        # Get create statement from the table
-        result = self.execute_query(connection, f"SHOW CREATE TABLE `{table_name}`")
-        if result.success and result.data:
-            table_info['create_statement'] = result.data[0].get('Create Table', '')
-
-        # Generate create statement from the table if not available
-        if not table_info['create_statement']:
-            table_info['create_statement'] = self.generate_create_statement(table_name, table_info)
-
-        # Generate insert statements from sample data from the table
-        insert_statement_list = []
-        for row in table_info['sample_data']: 
-            columns = list(row.keys())
-            values = []
+        
+        # Get sample data (limited to 2 rows)
+        sample_result = self.execute_query(connection, 
+            f"SELECT * FROM `{table_name}` LIMIT 2")
+        
+        if sample_result.success and sample_result.data:
+            table_info['sample_data'] = sample_result.data
+            column_names = list(sample_result.data[0].keys())
             
-            for col in columns:
-                val = row[col]
-                if val is None:
-                    values.append('NULL')
-                elif isinstance(val, (int, float)):
-                    values.append(str(val))
-                elif isinstance(val, bool):
-                    values.append('1' if val else '0')
-                else:
-                    escaped_val = str(val).replace("'", "''").replace("\\", "\\\\")
-                    values.append(f"'{escaped_val}'")
-            
-            table_ref = f"`{table_name}`"
-            col_ref = [f"`{col}`" for col in columns]
+            # Generate INSERT statements
+            for row in sample_result.data:
+                values = []
+                for val in row.values():
+                    if val is None:
+                        values.append('NULL')
+                    elif isinstance(val, (int, float)):
+                        values.append(str(val))
+                    elif isinstance(val, bool):
+                        values.append('1' if val else '0')
+                    else:
+                        escaped = str(val).replace("'", "''").replace("\\", "\\\\")
+                        values.append(f"'{escaped}'")
                 
-            insert_sql = f"INSERT INTO {table_ref} ({', '.join(col_ref)}) VALUES ({', '.join(values)})"
-            insert_statement_list.append(insert_sql)
-
-        table_info['insert_statement'] = "\n\n".join(insert_statement_list)
+                insert_sql = (
+                    f"INSERT INTO `{table_name}` ({', '.join(f'`{c}`' for c in column_names)}) "
+                    f"VALUES ({', '.join(values)});"
+                )
+                table_info['insert_statement'].append(insert_sql)
+        
+        # Get create statement
+        create_result = self.execute_query(connection, 
+            f"SHOW CREATE TABLE `{table_name}`")
+        
+        if create_result.success and create_result.data:
+            table_info['create_statement'] = create_result.data[0]['Create Table']
         
         return table_info
-
+    
+    def _get_db_details(self, schema: Dict[str, Any]) -> str:
+        """Generate formatted DDL statements from schema information"""
+        db_details = []
+        
+        for table_name, table_info in schema['tables'].items():
+            # Use original create statement if available
+            if table_info['create_statement']:
+                create_table = table_info['create_statement']
+            else:
+                # Build create statement from metadata
+                column_defs = []
+                for col_name, col_info in table_info['columns'].items():
+                    col_def = f"    `{col_name}` {col_info['type']}"
+                    
+                    if not col_info['nullable']:
+                        col_def += " NOT NULL"
+                    
+                    if col_info['default'] is not None:
+                        col_def += f" DEFAULT {col_info['default']}"
+                    
+                    if 'auto_increment' in col_info.get('extra', '').lower():
+                        col_def += " AUTO_INCREMENT"
+                    
+                    column_defs.append(col_def)
+                
+                # Add constraints
+                constraints = []
+                
+                # Primary keys
+                if table_info['primary_keys']:
+                    pk_cols = ", ".join(f"`{pk}`" for pk in table_info['primary_keys'])
+                    constraints.append(f"    PRIMARY KEY ({pk_cols})")
+                
+                # Foreign keys
+                for fk in table_info['foreign_keys']:
+                    fk_def = (
+                        f"    CONSTRAINT `fk_{table_name}_{fk['column']}` "
+                        f"FOREIGN KEY (`{fk['column']}`) "
+                        f"REFERENCES `{fk['referenced_table']}` (`{fk['referenced_column']}`)"
+                    )
+                    if fk.get('update_rule'):
+                        fk_def += f" ON UPDATE {fk['update_rule']}"
+                    if fk.get('delete_rule'):
+                        fk_def += f" ON DELETE {fk['delete_rule']}"
+                    constraints.append(fk_def)
+                
+                create_table = f"CREATE TABLE `{table_name}` (\n"
+                create_table += ",\n".join(column_defs + constraints)
+                create_table += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+            
+            db_details.append(create_table)
+            
+            # Add sample data if available
+            if table_info['sample_data']:
+                db_details.append("\n-- Sample data:")
+                db_details.extend(table_info['insert_statement'])
+        
+        return "\n\n".join(db_details)
+    
     def discover_databases(self, config: Dict) -> Dict[str, DatabaseInfo]:
-        """Discover MySQL databases"""
+        """Discover MySQL databases on server"""
         databases = {}
+        
         try:
+            # Create temp connection without specific database
             temp_config = {k: v for k, v in config.items() if k != 'database'}
             conn = self.connect(temp_config)
             
-            # Get list of databases from the server
-            result = self.execute_query(conn, "SHOW DATABASES")
+            # Get database list
+            result = self.execute_query(conn, 
+                "SELECT schema_name FROM information_schema.schemata "
+                "WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')")
+            
             if result.success:
-                system_dbs = {'information_schema', 'mysql', 'performance_schema', 'sys'}
                 for row in result.data:
-                    db_name = list(row.values())[0]
-                    if db_name not in system_dbs:
-                        databases[db_name] = DatabaseInfo(
-                            db_id=db_name,
-                            db_type='mysql',
-                            connection_info={**config, 'database': db_name},
-                            metadata={'host': config.get('host', 'localhost'), 
-                                    'port': config.get('port', 3306)}
-                        )
-                        self.logger.info(f"Discovered MySQL database: {db_name}")
+                    db_name = row['schema_name']
+                    databases[db_name] = DatabaseInfo(
+                        db_id=db_name,
+                        db_type='mysql',
+                        connection_info={**config, 'database': db_name},
+                        metadata={
+                            'host': config.get('host', 'localhost'),
+                            'port': config.get('port', 3306),
+                            'charset': config.get('charset', 'utf8mb4')
+                        }
+                    )
+                    self.logger.info(f"Discovered MySQL database: {db_name}")
             
             conn.close()
         except Exception as e:
-            self.logger.error(f"Error discovering MySQL databases: {e}")
+            self.logger.error(f"Database discovery failed: {e}")
         
         return databases
-
-    def close(self, connection: pymysql.Connection):
-        """Close database connection"""
-        try:
-            if connection:
-                connection.close()
-        except Exception as e:
-            self.logger.error(f"Error closing connection: {e}")
