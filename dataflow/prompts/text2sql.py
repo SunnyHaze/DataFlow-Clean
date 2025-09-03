@@ -1198,6 +1198,7 @@ class SQLVariationGeneratorPrompt:
             db_engine=db_engine
         )
 
+
     def build_prompt(self, original_sql, create_statements, insert_statements, db_engine) -> str:
         random.seed(42)
         if len(insert_statements) == 0:

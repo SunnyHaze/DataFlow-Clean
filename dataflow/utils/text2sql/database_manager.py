@@ -373,6 +373,7 @@ class DatabaseManager:
         schema = self.get_schema(db_id)
         return schema.get('tables', {}).get(table_name)
 
+
     def _create_error_result(self, error_msg: str) -> Dict[str, Any]:
         """Create standardized error result"""
         return {
