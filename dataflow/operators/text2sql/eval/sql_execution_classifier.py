@@ -67,8 +67,7 @@ class SQLExecutionClassifier(OperatorABC):
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
     
-    @staticmethod
-    def parse_response(response, logger):
+    def parse_response(response):
         pattern = r"```sql\s*(.*?)\s*```"
         
         sql_blocks = re.findall(pattern, response, re.DOTALL)
@@ -79,7 +78,6 @@ class SQLExecutionClassifier(OperatorABC):
         else:
             return ""
 
-    @staticmethod
     def execute_model_batch(predicted_sqls_list, ground_truth_list, database_manager, db_ids, idxs, meta_time_out, logger):
         comparisons = []
         sql_mapping = {}
@@ -118,15 +116,29 @@ class SQLExecutionClassifier(OperatorABC):
             }
         
         for batch_idx, comparison_result in enumerate(batch_results):
+            original_idx = sql_mapping[batch_idx]['original_idx']
+            sql_idx = sql_mapping[batch_idx]['sql_idx']
+            
             if comparison_result['result1_success'] and comparison_result['result2_success']:
                 res = 1 if comparison_result['equal'] else 0
+                results[original_idx]['results'][sql_idx] = {
+                    'res': res,
+                    'sql': sql_mapping[batch_idx]['sql'],
+                    'error': None
+                }
+                if res == 1:
+                    results[original_idx]['cnt_true'] += 1
             else:
                 error_msg = ""
                 if not comparison_result['result1_success']:
                     error_msg += f"Predicted SQL failed; "
                 if not comparison_result['result2_success']:
                     error_msg += f"Ground truth SQL failed"
-                result_item = {'res': 0, 'sql': mapping['sql'], 'error': error_msg}
+                results[original_idx]['results'][sql_idx] = {
+                    'res': 0,
+                    'sql': sql_mapping[batch_idx]['sql'],
+                    'error': error_msg
+                }
         
         return [results[i] for i in sorted(results.keys())]
 
@@ -235,7 +247,7 @@ class SQLExecutionClassifier(OperatorABC):
             parsed_sqls = []
             for response in question_responses:
                 if response:
-                    parsed_sql = self.parse_response(response, self.logger)
+                    parsed_sql = self.parse_response(response)
                     parsed_sqls.append(parsed_sql)
                 else:
                     parsed_sqls.append("")

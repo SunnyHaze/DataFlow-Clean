@@ -32,38 +32,39 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 
 def download_and_extract_database(logger):
     dataset_repo_id = "Open-Dataflow/dataflow-Text2SQL-database-example"
-    subfolder = "databases"
     local_dir = "./hf_cache"
     extract_to = "./downloaded_databases"
+    
     logger.info(f"Downloading and extracting database from {dataset_repo_id}...")
     os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-    snapshot_download(
+    
+    os.makedirs(local_dir, exist_ok=True)
+    os.makedirs(extract_to, exist_ok=True)
+    
+    downloaded_path = snapshot_download(
         repo_id=dataset_repo_id,
         repo_type="dataset",
-        allow_patterns=f"{subfolder}/*",  
         local_dir=local_dir,
-        resume_download=True  
+        resume_download=True
     )
-    logger.info(f"Database files downloaded to {local_dir}/{subfolder}")
-
-    zip_path = Path(local_dir) / subfolder / "databases.zip"
-    extract_path = Path(extract_to)
-
-    if zip_path.exists():
+    
+    logger.info(f"Files downloaded to: {downloaded_path}")
+    
+    zip_path = os.path.join(downloaded_path, "databases.zip")
+    if os.path.exists(zip_path):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_path)
-        logger.info(f"Database files extracted to {extract_path}")
-        return str(extract_path) 
+            zip_ref.extractall(extract_to)
+        logger.info(f"Database files extracted to {extract_to}")
+        return extract_to
     else:
-        raise FileNotFoundError(f"Database files not found in {zip_path}")
+        raise FileNotFoundError(f"Database zip file not found at {zip_path}")
 
 class Text2SQLRefine_APIPipeline():
-    def __init__(self, auto_download_db=False):
-
+    def __init__(self, db_root_path=""):
         self.logger = get_logger()
-        self.db_root_path = "" 
+        self.db_root_path = db_root_path
 
-        if auto_download_db:
+        if not db_root_path:
             try:
                 self.db_root_path = download_and_extract_database(self.logger)
                 self.logger.info(f"Using automatically downloaded database at: {self.db_root_path}")
@@ -71,15 +72,10 @@ class Text2SQLRefine_APIPipeline():
                 self.logger.error(f"Failed to auto-download database: {e}")
                 raise 
         else:
-             if not self.db_root_path:
-                self.logger.error(
-                    "Auto-download is disabled and 'db_root_path' is not set. "
-                    "Please manually assign the path to the database files to 'self.db_root_path' "
-                    "before initializing the DatabaseManager, or set auto_download_db=True."
-                )
-                raise ValueError("Database path is not specified, please specify the database path manually.")
-             else:
-                 self.logger.info(f"Using manually specified database path: {self.db_root_path}")
+            self.logger.info(f"Using manually specified database path: {self.db_root_path}")
+
+        if not os.path.exists(self.db_root_path):
+            raise FileNotFoundError(f"Database path does not exist: {self.db_root_path}")
 
         self.storage = FileStorage(
             first_entry_file_name="../example_data/Text2SQLPipeline/pipeline_refine.jsonl",
@@ -126,8 +122,7 @@ class Text2SQLRefine_APIPipeline():
             db_type="sqlite",
             config={
                 "root_path": self.db_root_path
-            },
-            sql_execution_timeout = 5 # SQL execution timeout. Generated SQL execution time should be less than this value.
+            }
         )
         
         self.sql_execution_filter_step1 = SQLExecutionFilter(
@@ -173,16 +168,16 @@ class Text2SQLRefine_APIPipeline():
         )
 
         self.sql_component_classifier_step8 = SQLComponentClassifier(
-            difficulty_thresholds = [2, 4, 6],
-            difficulty_labels = ['easy', 'medium', 'hard', 'extra']
+            difficulty_thresholds=[2, 4, 6],
+            difficulty_labels=['easy', 'medium', 'hard', 'extra']
         )
 
         self.sql_execution_classifier_step9 = SQLExecutionClassifier(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            num_generations = 10,
-            difficulty_thresholds = [2, 5, 9],
-            difficulty_labels = ['extra', 'hard', 'medium', 'easy']
+            num_generations=10,
+            difficulty_thresholds=[2, 5, 9],
+            difficulty_labels=['extra', 'hard', 'medium', 'easy']
         )
         
         
@@ -254,5 +249,9 @@ class Text2SQLRefine_APIPipeline():
         )
 
 if __name__ == "__main__":
-    model = Text2SQLRefine_APIPipeline(auto_download_db=True)
+    # If you have your own database files, you can set the db_root_path to the path of your database files
+    # If not, please set the db_root_path "", and we will download the example database files automatically
+    db_root_path = ""
+
+    model = Text2SQLRefine_APIPipeline(db_root_path=db_root_path)
     model.forward()

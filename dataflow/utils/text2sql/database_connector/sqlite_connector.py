@@ -7,14 +7,10 @@ import time
 
 # ============== SQLite Connector ==============
 class SQLiteConnector(DatabaseConnectorABC):
-    
+
     def connect(self, connection_info: Dict) -> sqlite3.Connection:
         db_path = connection_info['path']
-        conn = sqlite3.connect(
-            db_path,
-            timeout=30,
-            check_same_thread=False  
-        )
+        conn = sqlite3.connect(db_path, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA query_only = ON")
         return conn
@@ -50,9 +46,9 @@ class SQLiteConnector(DatabaseConnectorABC):
                 cursor.close()
     
     def get_schema_info(self, connection: sqlite3.Connection) -> Dict[str, Any]:
-        """Get complete schema information for SQLite database"""
+        """Get complete schema information with formatted DDL"""
         schema = {'tables': {}}
-        
+
         result = self.execute_query(
             connection, 
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -65,66 +61,42 @@ class SQLiteConnector(DatabaseConnectorABC):
             table_name = row['name']
             table_info = self._get_table_info(connection, table_name)
             schema['tables'][table_name] = table_info
-        
+
+        schema['db_details'] = self._get_db_details(schema)
         return schema
 
-    def generate_create_statement(self, table_name: str, table_info: Dict[str, Any]) -> str:
-        """Generate CREATE TABLE statements from schema"""
-        create_stmt = ""
-
-        columns = []
-        for col_name, col_info in table_info.get('columns', {}).items():
-            col_def = f"`{col_name}` {col_info['type']}"
-            if not col_info.get('nullable', True):
-                col_def += " NOT NULL"
-            if col_info.get('default') is not None:
-                col_def += f" DEFAULT {col_info['default']}"
-            columns.append(col_def)
-            
-        # Primary keys
-        pk_cols = table_info.get('primary_keys', [])
-        if pk_cols:
-            columns.append(f"PRIMARY KEY ({', '.join(f'`{pk}`' for pk in pk_cols)})")
-            
-        # Foreign keys
-        for fk in table_info.get('foreign_keys', []):
-            fk_def = (f"FOREIGN KEY (`{fk['column']}`) "
-                        f"REFERENCES `{fk['referenced_table']}`(`{fk['referenced_column']}`)")
-            columns.append(fk_def)
-            
-        if columns:
-            create_stmt = f"CREATE TABLE `{table_name}` (\n  " + ",\n  ".join(columns) + "\n);"
-        
-        return create_stmt
-    
     def _get_table_info(self, connection: sqlite3.Connection, table_name: str) -> Dict[str, Any]:
         """Get detailed table information"""
-        # The info must include the following six fields: columns, primary_keys, foreign_keys, sample_data, create_statement, insert_statement
         table_info = {
             'columns': {},
             'primary_keys': [],
             'foreign_keys': [],
             'sample_data': [],
             'create_statement': None,
-            'insert_statement': None
+            'insert_statement': []
         }
         
-        # Get columns information
-        result = self.execute_query(connection, f"PRAGMA table_info([{table_name}])")
+        result = self.execute_query(connection, "PRAGMA table_info(?)", (table_name,))
         if result.success:
             for col in result.data:
                 col_name = col['name']
+                default_value = col['dflt_value']
+                if default_value is not None and isinstance(default_value, str):
+                    if default_value.upper() in ('CURRENT_TIMESTAMP', 'NULL'):
+                        default_value = default_value.upper()
+                    else:
+                        default_value = f"'{default_value}'"
+                
                 table_info['columns'][col_name] = {
                     'type': col['type'],
                     'nullable': not col['notnull'],
-                    'default': col['dflt_value'],
+                    'default': default_value,
                     'primary_key': bool(col['pk'])
                 }
                 if col['pk']:
                     table_info['primary_keys'].append(col_name)
         
-        # Get foreign keys
-        result = self.execute_query(connection, f"PRAGMA foreign_key_list([{table_name}])")
+        result = self.execute_query(connection, "PRAGMA foreign_key_list(?)", (table_name,))
         if result.success:
             for fk in result.data:
                 table_info['foreign_keys'].append({
@@ -133,41 +105,75 @@ class SQLiteConnector(DatabaseConnectorABC):
                     'referenced_column': fk['to']
                 })
         
-        # Get sample data from the table
-        result = self.execute_query(connection, f"SELECT * FROM [{table_name}]")
+        result = self.execute_query(connection, f"SELECT * FROM `{table_name}` LIMIT 2")
         if result.success and result.data:
             table_info['sample_data'] = result.data
-
-        # Get create statement from the table
-        table_info['create_statement'] = self.generate_create_statement(table_name, table_info)
-
-        # Generate insert statements from sample data from the table
-        insert_statement_list = []
-        
-        for row in table_info['sample_data']:  
-            columns = list(row.keys())
-            values = []
+            column_names = list(result.data[0].keys())
             
-            for col in columns:
-                val = row[col]
-                if val is None:
-                    values.append('NULL')
-                elif isinstance(val, (int, float)):
-                    values.append(str(val))
-                else:
-                    escaped_val = str(val).replace("'", "''")
-                    values.append(f"'{escaped_val}'")
-            
-            table_ref = f"[{table_name}]"
-            col_ref = [f"[{col}]" for col in columns]
-
+            for row in result.data:
+                values = []
+                for value in row.values():
+                    if value is None:
+                        values.append('NULL')
+                    elif isinstance(value, (int, float)):
+                        values.append(str(value))
+                    else:
+                        escaped = str(value).replace("'", "''")
+                        values.append(f"'{escaped}'")
                 
-            insert_sql = f"INSERT INTO {table_ref} ({', '.join(col_ref)}) VALUES ({', '.join(values)})"
-            insert_statement_list.append(insert_sql)
+                table_info['insert_statement'].append(
+                    f"INSERT INTO `{table_name}` ({', '.join(column_names)}) VALUES ({', '.join(values)});"
+                )
 
-        table_info['insert_statement'] = "\n\n".join(insert_statement_list)
+        result = self.execute_query(connection, 
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name = ?", 
+            (table_name,))
+        if result.success and result.data:
+            table_info['create_statement'] = result.data[0]['sql']
         
         return table_info
+
+    def _get_db_details(self, schema: Dict[str, Any]) -> str:
+        """Generate formatted DDL statements from schema information"""
+        db_details = []
+        
+        for table_name, table_info in schema['tables'].items():
+            column_defs = []
+            for col_name, col_info in table_info['columns'].items():
+                col_def = f"    `{col_name}` {col_info['type']}"
+                
+                if not col_info['nullable']:
+                    col_def += " NOT NULL"
+                    
+                if col_info['default'] is not None:
+                    col_def += f" DEFAULT {col_info['default']}"
+                    
+                column_defs.append(col_def)
+            
+            constraints = []
+            
+            if table_info['primary_keys']:
+                pk_cols = ", ".join(f"`{col}`" for col in table_info['primary_keys'])
+                constraints.append(f"    PRIMARY KEY ({pk_cols})")
+            
+            for i, fk in enumerate(table_info['foreign_keys']):
+                constraints.append(
+                    f"    CONSTRAINT fk_{table_name}_{fk['column']}_{i} "
+                    f"FOREIGN KEY (`{fk['column']}`) "
+                    f"REFERENCES `{fk['referenced_table']}` (`{fk['referenced_column']}`)"
+                )
+            
+            create_table = f"CREATE TABLE `{table_name}` (\n"
+            create_table += ",\n".join(column_defs + constraints)
+            create_table += "\n);"
+            
+            if table_info['sample_data']:
+                create_table += "\n\n-- Sample data:\n"
+                create_table += "\n".join(table_info['insert_statement'])
+            
+            db_details.append(create_table)
+        
+        return "\n\n".join(db_details)
 
     def discover_databases(self, config: Dict) -> Dict[str, DatabaseInfo]:
         """Discover SQLite database files"""

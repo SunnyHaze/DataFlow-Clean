@@ -58,15 +58,6 @@ class Text2SQLCoTGenerator(OperatorABC):
         missing_columns = [col for col in required_columns if col not in dataframe.columns]
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
-
-    def get_schema_info(self, db_id: str) -> str:
-        create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(db_id)
-        create_statements_str = "\n\n".join(create_statements)
-        insert_statements_str = "\n\n".join(insert_statements)
-        return "\n\n".join([create_statements_str, insert_statements_str])
-
-    def generate_cot_synthesis_prompts(self, schema_info: str, question: str, sql: str) -> str:
-        return self.prompt_template.build_prompt(schema_info, question, sql)
     
     def extract_sql(self, response):
         pattern = r"```sql\s*(.*?)\s*```"
@@ -105,10 +96,10 @@ class Text2SQLCoTGenerator(OperatorABC):
             prompts = []
             for item in failed_items:
                 db_id = item.get(self.input_db_id_key)
-                formatted_schema = self.get_schema_info(db_id)
                 question = item.get(self.input_question_key)
                 sql = item.get(self.input_sql_key)
-                cot_prompt = self.generate_cot_synthesis_prompts(formatted_schema, question, sql)
+                db_details = self.database_manager.get_db_details(db_id)
+                cot_prompt = self.prompt_template.build_prompt(db_details, question, sql)
                 prompts.append(cot_prompt)
             
             cot_responses = self.llm_serving.generate_from_input(prompts, "")
