@@ -330,8 +330,17 @@ class DatabaseManager:
     def _get_insert_statements(self, schema: Dict[str, Any]) -> List[str]:
         insert_statement_list = []
         for table_info in schema['tables'].values():
-            insert_statement_list.extend(table_info['insert_statement'])
+            insert_statements_for_table = table_info.get('insert_statement')
+            
+            # 在尝试添加前，先检查它是否为有效值 (不是 None 或空字符串)
+            if insert_statements_for_table:
+                # 你的 _get_table_info 函数将一个表的所有INSERT语句合并成了一个字符串。
+                # 我们应该用 .append() 将这个字符串作为一个整体添加到列表中。
+                # (之前的 .extend() 会错误地将字符串拆成单个字符添加)
+                insert_statement_list.append(insert_statements_for_table)
+                
         return insert_statement_list
+
 
     def get_create_statements_and_insert_statements(self, db_id: str) -> tuple:
         if not self.database_exists(db_id):

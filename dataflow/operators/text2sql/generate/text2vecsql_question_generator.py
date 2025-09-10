@@ -134,12 +134,12 @@ class Text2VecSQLQuestionGenerator(OperatorABC):
         else:
             raw_data = [row.to_dict() for _, row in raw_dataframe.iterrows()]
         
-        styles = list(self.prompt_template.style2desc.keys())
+        styles = ["Formal", "Colloquial", "Imperative", "Interrogative", "Descriptive", "Concise", "Vague", "Metaphorical"]
         db_ids = list(set([data[self.input_db_id_key] for data in raw_data]))
         db_id2column_info = dict()
         
         for db_id in tqdm(db_ids, desc="Extracting database schema"):
-            _, create_statements = self.database_manager.get_table_names_and_create_statements(db_id)
+            create_statements, _ = self.database_manager.get_create_statements_and_insert_statements(db_id)
             db_id2column_info[db_id] = self.extract_column_descriptions(create_statements)
         
         self.logger.info("Generating question candidates...")
@@ -147,20 +147,17 @@ class Text2VecSQLQuestionGenerator(OperatorABC):
         prompt_data_mapping = []
         
         for data in tqdm(raw_data, desc="Preparing prompts"):
-            style_name = random.choice(styles)
-            column_info = db_id2column_info[data[self.input_db_id_key]]
-            sql_query = data[self.input_sql_key]
-
-            used_columns = {k: v for k, v in column_info.items() if k.lower() in sql_query.lower()}
-            
-            prompt = self.prompt_template.build_prompt(
-                style_name=style_name,
-                engine=self.database_manager.db_type,
-                extension="sqlite-vec and sqlite-lembed",
-                column_info=used_columns,
-                sql=sql_query
+            prompt, style_name = self.prompt_template.build_prompt(
+                data,
+                self.input_db_id_key,
+                self.input_sql_key,
+                styles,
+                db_id2column_info,
+                self.database_manager.db_type,
+                using_sqlite_vec = True,
+                extension="sqlite_vec and sqlite_lembed"
             )
-
+            
             for _ in range(self.question_candidates_num):
                 prompts.append(prompt)
                 prompt_data_mapping.append({**data, "style": style_name})
@@ -222,7 +219,7 @@ class Text2VecSQLQuestionGenerator(OperatorABC):
             all_results = existing_data + processed_results
         else:
             all_results = processed_results
-         
+        
         final_df = pd.DataFrame(all_results)
         output_file = storage.write(final_df)
         

@@ -64,7 +64,6 @@ class VecSQLExecutionFilter(OperatorABC):
         dataframe = storage.read("dataframe")
         self.check_column(dataframe)
         
-        # This checks if the database exists.
         db_id_need_to_check = dataframe[input_db_id_key].unique()
         for db_id in db_id_need_to_check:
             if not self.database_manager.database_exists(db_id):
@@ -82,13 +81,13 @@ class VecSQLExecutionFilter(OperatorABC):
 
         self.logger.info(f"Phase 1 completed: {len(phase1_passed_indices)}/{len(dataframe)} SQLs passed initial filter")
 
-        # This executes the queries in batch.
-        db_ids = dataframe.loc[phase1_passed_indices][input_db_id_key]
-        sql_list = dataframe.loc[phase1_passed_indices][input_sql_key]
-        execution_results = self.database_manager.batch_execute_queries(db_ids, sql_list)
+        db_ids = dataframe[input_db_id_key]
+        sql_list = dataframe[input_sql_key]
+        sql_triples = [(db_id, sql) for db_id, sql in zip(db_ids, sql_list)]
+        execution_results = self.database_manager.batch_execute_queries(sql_triples)
 
         final_indices = []
-        for idx, exec_result in zip(phase1_passed_indices, execution_results):
+        for idx, exec_result in enumerate(execution_results):
             if exec_result.success:
                 final_indices.append(idx)
 
@@ -96,6 +95,5 @@ class VecSQLExecutionFilter(OperatorABC):
 
         result_df = dataframe.loc[final_indices]
         
-        # This writes the results to a file.
         output_file = storage.write(result_df)
         return []

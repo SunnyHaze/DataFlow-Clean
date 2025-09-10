@@ -18,7 +18,9 @@ if TYPE_CHECKING:
 
     # eval
     from eval.sql_component_classifier import SQLComponentClassifier
+    from eval.sql_component_classifier import VecSQLComponentClassifier
     from eval.sql_execution_classifier import SQLExecutionClassifier
+    from eval.vecsql_execution_classifier import VecSQLExecutionClassifier
 
 else:
     import sys
