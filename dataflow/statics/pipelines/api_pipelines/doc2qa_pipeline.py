@@ -13,7 +13,7 @@ class AgenticRAG_APIPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
-            first_entry_file_name="../example_data/AgenticRAGPipeline/pipeline_small_chunk.json",
+            first_entry_file_name="../example_data/core_text_data/pipeline_small_chunk.json",
             cache_path="./cache_local",
             file_name_prefix="dataflow_cache_step",
             cache_type="json",
