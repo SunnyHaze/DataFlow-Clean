@@ -74,6 +74,8 @@ class BlocklistFilter(OperatorABC):
                     text = text.lower().split()
                 blocklist_count = sum(1 for word in text if word in self.blocklist)
                 valid_checks.append(blocklist_count <= self.threshold)
+            else:
+                valid_checks.append(0)
         valid_checks = np.array(valid_checks, dtype=int)
         dataframe[self.output_key] = valid_checks
         filtered_dataframe = dataframe[valid_checks == 1]
