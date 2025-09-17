@@ -51,9 +51,6 @@ class SQLGenerator(OperatorABC):
         else:
             return "SQL generator for Text2SQL tasks."
 
-    def get_create_statements_and_insert_statements(self, db_id: str) -> str:
-        return self.database_manager.get_create_statements_and_insert_statements(db_id)
-
     def parse_response(self, response):
         if not response:
             return ""  
@@ -80,7 +77,7 @@ class SQLGenerator(OperatorABC):
         self.logger.info(f"Generating {self.generate_num} SQLs for each database")
 
         for db_name in tqdm(db_names, desc="Processing Databases"):
-            create_statements, insert_statements = self.get_create_statements_and_insert_statements(db_name)
+            create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(db_name)
 
             for _ in range(self.generate_num):
                 prompt = self.prompt_template.build_prompt(

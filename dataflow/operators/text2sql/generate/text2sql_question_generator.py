@@ -129,7 +129,6 @@ class Text2SQLQuestionGenerator(OperatorABC):
         else:
             raw_data = [row.to_dict() for _, row in raw_dataframe.iterrows()]
         
-        styles = ["Formal", "Colloquial", "Imperative", "Interrogative", "Descriptive", "Concise", "Vague", "Metaphorical"]
         db_ids = list(set([data[self.input_db_id_key] for data in raw_data]))
         db_id2column_info = dict()
         
@@ -142,18 +141,17 @@ class Text2SQLQuestionGenerator(OperatorABC):
         prompt_data_mapping = []
         
         for data in tqdm(raw_data, desc="Preparing prompts"):
-            prompt, style_name = self.prompt_template.build_prompt(
+            prompt = self.prompt_template.build_prompt(
                 data,
                 self.input_db_id_key,
                 self.input_sql_key,
-                styles,
                 db_id2column_info,
                 self.database_manager.db_type
             )
             
             for _ in range(self.question_candidates_num):
                 prompts.append(prompt)
-                prompt_data_mapping.append({**data, "style": style_name})
+                prompt_data_mapping.append({**data})
 
         responses = self.llm_serving.generate_from_input(prompts, system_prompt="You are a helpful assistant.")
         

@@ -14,8 +14,6 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 class Text2SQLCoTGenerator(OperatorABC):
     def __init__(self, llm_serving: LLMServingABC, 
                 database_manager: DatabaseManager,
-                max_retries: int = 3,
-                enable_retry: bool = True,
                 prompt_template = None
                 ):
         self.llm_serving = llm_serving
@@ -25,8 +23,8 @@ class Text2SQLCoTGenerator(OperatorABC):
         self.prompt_template = prompt_template
         self.logger = get_logger()
 
-        self.max_retries = max_retries
-        self.enable_retry = enable_retry
+        self.max_retries = 3
+        self.enable_retry = True
 
     @staticmethod
     def get_desc(lang):
@@ -98,8 +96,9 @@ class Text2SQLCoTGenerator(OperatorABC):
                 db_id = item.get(self.input_db_id_key)
                 question = item.get(self.input_question_key)
                 sql = item.get(self.input_sql_key)
-                db_details = self.database_manager.get_db_details(db_id)
-                cot_prompt = self.prompt_template.build_prompt(db_details, question, sql)
+                create_statements, _ = self.database_manager.get_create_statements_and_insert_statements(db_id)
+                schema_str = "\n\n".join(create_statements)
+                cot_prompt = self.prompt_template.build_prompt(schema_str, question, sql)
                 prompts.append(cot_prompt)
             
             cot_responses = self.llm_serving.generate_from_input(prompts, "")

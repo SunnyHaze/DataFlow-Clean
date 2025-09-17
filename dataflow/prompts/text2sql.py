@@ -52,7 +52,7 @@ class Text2SQLCotGeneratorPrompt:
     def __init__(self):
         pass
 
-    def build_prompt(self, db_details: str, question: str, sql: str) -> str:
+    def build_prompt(self, schema_str: str, question: str, sql: str) -> str:
         prompt = f"""
         You are a senior data analyst specializing in SQL. Your task is to translate a natural language question into an executable SQLite query, providing a detailed reasoning trace.
 
@@ -69,7 +69,7 @@ class Text2SQLCotGeneratorPrompt:
         ```
 
         [Database Schema]:
-        {db_details}
+        {schema_str}
 
         [Natural Language Question]:
         {question}
@@ -186,6 +186,7 @@ class SelectSQLGeneratorPrompt:
         INNER JOIN DepartmentStats dstat ON ds.department_id = dstat.department_id
         ORDER BY ds.level, ds.name;
         ```'''
+
         self.complexity2criterion = {
             "Simple": self.simple_criterion,
             "Moderate": self.moderate_criterion,
@@ -305,6 +306,7 @@ class SelectSQLGeneratorPrompt:
     def insert_stmts_template(self, insert_statements: str) -> str:
         template = '''### INSERT INTO Statements
         Below are several `INSERT INTO` statements. Use these to help generate predicates (i.e., `WHERE` clauses) in your SQL query:
+        
         {insert_statements}
         '''
         return template.format(insert_statements=insert_statements)
@@ -349,7 +351,7 @@ class SelectSQLGeneratorPrompt:
             column_count=column_count
         )
 
-    def build_prompt(self, insert_statements: List[str], create_statements: List[str], db_engine: str) -> tuple[str, str]:
+    def build_prompt(self, insert_statements: List[str], create_statements: List[str], db_engine: str) -> str:
         random.seed(42)
         complexity = random.sample(["Simple", "Moderate", "Complex", "Highly Complex"], 1)[0]
 
@@ -367,7 +369,7 @@ class SelectSQLGeneratorPrompt:
             sql_function_prompt = "### SQL Functions\nYou can use any function supported by the database engine."
         else:
             sql_funcs = ""
-            sampled_functions = random.sample(self.functions, min(function_num, len(self.functions)))
+            sampled_functions = random.sample(self.functions, function_num)
             for idx, func in enumerate(sampled_functions):
                 sql_funcs += f"Function {idx + 1}:\n{func.strip()}\n"
             sql_function_prompt = self.sql_func_template(sql_funcs=sql_funcs)
@@ -382,14 +384,11 @@ class SelectSQLGeneratorPrompt:
             db_engine=db_engine,
             column_count=column_count
         )
-        return prompt, complexity
+        return prompt
 
 class Text2SQLQuestionGeneratorPrompt:
     def __init__(self):
-        pass
-
-    def get_style2desc(self):
-        template = {
+        self.style2desc = {
         "Formal": '''**Formal Style**
         - Uses standard grammar and vocabulary.
         - Example: Find all students older than 18 years and return their home addresses.''',
@@ -422,48 +421,34 @@ class Text2SQLQuestionGeneratorPrompt:
         - Uses metaphors or metaphorical expressions.
         - Example: Find the names and addresses of those who have reached adulthood. (External Knowledge: 'reached adulthood' refers to age >= 18.)'''
         }
-        return template
 
-    def get_steps_wo_ek(self):
-        template = '''1. **Explain the SQL Query:** Provide a detailed explanation of what the query does.
+        self.steps_wo_ek = '''1. **Explain the SQL Query:** Provide a detailed explanation of what the query does.
         2. **Generate a Question:** Formulate a natural language question based on the SQL query and explanation.'''
-        return template
 
-    def get_steps_w_ek(self):
-        template = '''1. **Explain the SQL Query:** Provide a detailed explanation of what the query does.
+        self.steps_w_ek = '''1. **Explain the SQL Query:** Provide a detailed explanation of what the query does.
         2. **Generate a Question:** Formulate a natural language question based on the SQL query and explanation.
         3. **External Knowledge:** For Vague or Metaphorical styles, include external knowledge to enhance clarity.'''
-        return template
 
-    def get_steps_multi_round(self):
-        template = '''1. **Explain the SQL Query:** Provide a detailed explanation of what the query does.
+        self.steps_multi_round = '''1. **Explain the SQL Query:** Provide a detailed explanation of what the query does.
         2. **Generate a Dialogue:** Create a conversation between the User and the Assistant based on the SQL query and its explanation.'''
-        return template
 
-    def get_guidelines_wo_ek(self):
-        template = '''1. Clearly describe the columns being selected by the SQL query. For example:
+        self.guidelines_wo_ek = '''1. Clearly describe the columns being selected by the SQL query. For example:
         - "SELECT * ... FROM ..." means "Find all ...";
         - "SELECT f.check_date, f.status, f.remarks, c.year, c.year_min, c.year_max, c.year_average, c.data_quality_score FROM ..." means "Return the check dates, statuses, remarks, years, minimum years, maximum years, average years, and quality scores for ...".
         2. Ensure the natural language question accurately captures the semantics of the SQL query, including conditions such as predicates, `ORDER BY`, and `LIMIT` clauses.'''
-        return template
 
-    def get_guidelines_w_ek(self):
-        template = '''1. Clearly describe the columns being selected by the SQL query. For example:
+        self.guidelines_w_ek = '''1. Clearly describe the columns being selected by the SQL query. For example:
         - "SELECT * ... FROM ..." means "Find all ...";
         - "SELECT f.check_date, f.status, f.remarks, c.year, c.year_min, c.year_max, c.year_average, c.data_quality_score FROM ..." means "Return the check dates, statuses, remarks, years, minimum years, maximum years, average years, and quality scores for ...".
         2. Ensure the natural language question accurately captures the semantics of the SQL query, including conditions such as predicates, `ORDER BY`, and `LIMIT` clauses.
         3. If necessary, incorporate external knowledge using multiple entries separated by semicolons (";"). These can include formulas, common sense, domain-specific knowledge, or extended context, such as information from long documents. Each entry should be concise.'''
-        return template
 
-    def get_guidelines_multi_round(self):
-        template = '''1. Clearly describe the columns being selected by the SQL query. For example:
+        self.guidelines_multi_round = '''1. Clearly describe the columns being selected by the SQL query. For example:
         - "SELECT * ... FROM ..." means "Find all ...";
         - "SELECT f.check_date, f.status, f.remarks, c.year, c.year_min, c.year_max, c.year_average, c.data_quality_score FROM ..." means "Return the check dates, statuses, remarks, years, minimum years, maximum years, average years, and quality scores for ...".
         2. Ensure the conversation accurately captures the semantics of the SQL query, including conditions such as predicates, `ORDER BY`, and `LIMIT` clauses.'''
-        return template
 
-    def get_output_format_wo_ek(self):
-        template = '''Please structure your response as follows:
+        self.output_format_wo_ek = '''Please structure your response as follows:
 
         [EXPLANATION-START]
         (SQL Explanation)
@@ -475,10 +460,8 @@ class Text2SQLQuestionGeneratorPrompt:
 
         - **SQL Explanation**: Provide a clear and detailed explanation of the SQL query, enclosed within [EXPLANATION-START] and [EXPLANATION-END].
         - **Natural Language Question**: Translate the SQL query into a natural language question, enclosed within [QUESTION-START] and [QUESTION-END].'''
-        return template
 
-    def get_output_format_w_ek(self):
-        template = '''Please structure your response as follows:
+        self.output_format_w_ek = '''Please structure your response as follows:
 
         [EXPLANATION-START]
         (SQL Explanation)
@@ -495,10 +478,8 @@ class Text2SQLQuestionGeneratorPrompt:
         - **SQL Explanation**: Provide a clear and detailed explanation of the SQL query, enclosed within [EXPLANATION-START] and [EXPLANATION-END].
         - **Natural Language Question**: Translate the SQL query into a natural language question, enclosed within [QUESTION-START] and [QUESTION-END].
         - **External Knowledge**: Include any relevant external knowledge if applicable, enclosed within [EXTERNAL-KNOWLEDGE-START] and [EXTERNAL-KNOWLEDGE-END]. Leave this section blank if not needed.'''
-        return template
 
-    def get_output_format_multi_round(self):
-        template = '''Please structure your response as follows:
+        self.output_format_multi_round = '''Please structure your response as follows:
 
         [EXPLANATION-START]
         (SQL Explanation)
@@ -510,23 +491,14 @@ class Text2SQLQuestionGeneratorPrompt:
 
         - **SQL Explanation**: Provide a clear and detailed explanation of the SQL query, enclosed within [EXPLANATION-START] and [EXPLANATION-END].
         - **Natural Language Question**: Convert the SQL query into a multi-round dialogue, enclosed within [QUESTION-START] and [QUESTION-END]. Represent this as a list that captures multiple rounds of conversation between the User and the Assistant.'''
-        return template
 
-    def get_instruction_wo_ek(self):
-        template = "Based on the above information, follow the reasoning steps to generate the explanation and the question corresponding to the SQL query."
-        return template
+        self.instruction_wo_ek = "Based on the above information, follow the reasoning steps to generate the explanation and the question corresponding to the SQL query."
 
-    def get_instruction_w_ek(self):
-        template = "Based on the above information, follow the reasoning steps to generate the explanation, the question, and the external knowledge corresponding to the SQL query."
-        return template
+        self.instruction_w_ek = "Based on the above information, follow the reasoning steps to generate the explanation, the question, and the external knowledge corresponding to the SQL query."
 
-    def get_instruction_multi_round(self):
-        template = "Based on the above information, follow the reasoning steps to generate the explanation and the dialogue corresponding to the SQL query."
-        return template
+        self.instruction_multi_round = "Based on the above information, follow the reasoning steps to generate the explanation and the dialogue corresponding to the SQL query."
 
     def question_synthesis_prompt(self, style_desc, engine, column_info, sql, steps, guidelines, output_format, instruction):
-
-
         template = '''**Task Overview**
         Your task is to create a high-quality natural language question based on a given SQL query and other information.
 
@@ -571,6 +543,8 @@ class Text2SQLQuestionGeneratorPrompt:
         )  
 
     def build_prompt(self, data, input_db_id_key, input_sql_key, styles, db_id2column_info, db_type) -> str:
+        random.seed(42)
+        styles = ["Formal", "Colloquial", "Imperative", "Interrogative", "Descriptive", "Concise", "Vague", "Metaphorical"]
         style_name = random.sample(styles, 1)[0]
         column_name2column_desc = db_id2column_info[data[input_db_id_key]]
         used_column_name2column_desc = dict()
@@ -580,18 +554,18 @@ class Text2SQLQuestionGeneratorPrompt:
                 used_column_name2column_desc[column_name] = column_desc
 
         if style_name in ["Vague", "Metaphorical"]:
-            steps = self.get_steps_w_ek()
-            guidelines = self.get_guidelines_w_ek()
-            instruction = self.get_instruction_w_ek()
-            output_format = self.get_output_format_w_ek()
+            steps = self.steps_w_ek
+            guidelines = self.guidelines_w_ek
+            instruction = self.instruction_w_ek
+            output_format = self.output_format_w_ek
         else:
-            steps = self.get_steps_wo_ek()
-            guidelines = self.get_guidelines_wo_ek()
-            instruction = self.get_instruction_wo_ek()
-            output_format = self.get_output_format_wo_ek()
+            steps = self.steps_wo_ek
+            guidelines = self.guidelines_wo_ek
+            instruction = self.instruction_wo_ek
+            output_format = self.output_format_wo_ek
 
         prompt = self.question_synthesis_prompt(
-            style_desc=self.get_style2desc()[style_name].strip(),
+            style_desc=self.style2desc[style_name].strip(),
             engine=db_type,
             column_info=json.dumps(used_column_name2column_desc, indent=2, ensure_ascii=False).strip(),
             sql=data[input_sql_key].strip(),
@@ -601,15 +575,12 @@ class Text2SQLQuestionGeneratorPrompt:
             instruction=instruction.strip()
         )
 
-        return prompt, style_name
+        return prompt
 
 
 class SQLVariationGeneratorPrompt:
     def __init__(self):
-        pass
-
-    def variation_type_prompt(self, variation_type: int):
-        type_prompts = [
+        self.type_prompts = [
             '''
             Data Value Transformations
             - Alter filter conditions, date ranges, or numerical thresholds
@@ -652,7 +623,6 @@ class SQLVariationGeneratorPrompt:
             - Add appropriate WHERE clause optimizations
             ''',
         ]
-        return type_prompts[variation_type]
 
     def insert_stmts_template(self, insert_statements):
         template = '''### INSERT INTO Statements
@@ -738,30 +708,30 @@ class Text2SQLPromptGeneratorPrompt:
             question_and_evidence = question
             
         template = """Task Overview:
-You are a data science expert. Below, you are provided with a database schema and a natural language question. Your task is to understand the schema and generate a valid SQL query to answer the question.
+        You are a data science expert. Below, you are provided with a database schema and a natural language question. Your task is to understand the schema and generate a valid SQL query to answer the question.
 
-Database Engine:
-{db_engine}
+        Database Engine:
+        {db_engine}
 
-Database Schema:
-{db_details}
-This schema describes the database's structure, including tables, columns, primary keys, foreign keys, and any relevant relationships or constraints.
+        Database Schema:
+        {db_details}
+        This schema describes the database's structure, including tables, columns, primary keys, foreign keys, and any relevant relationships or constraints.
 
-Question:
-{question_and_evidence}
+        Question:
+        {question_and_evidence}
 
-Instructions:
-- Make sure you only output the information that is asked in the question. If the question asks for a specific column, make sure to only include that column in the SELECT clause, nothing more.
-- The generated query should return all of the information asked in the question without any missing or extra information.
-- Before generating the final SQL query, please think through the steps of how to write the query.
+        Instructions:
+        - Make sure you only output the information that is asked in the question. If the question asks for a specific column, make sure to only include that column in the SELECT clause, nothing more.
+        - The generated query should return all of the information asked in the question without any missing or extra information.
+        - Before generating the final SQL query, please think through the steps of how to write the query.
 
-Output Format:
-In your answer, please enclose the generated SQL query in a code block:
-sql
--- Your SQL query
+        Output Format:
+        In your answer, please enclose the generated SQL query in a code block:
+        sql
+        -- Your SQL query
 
 
-Take a deep breath and think step by step to find the correct SQL query.
+        Take a deep breath and think step by step to find the correct SQL query.
         """
 
         prompt = template.format(db_details=db_details, question_and_evidence=question_and_evidence, db_engine=db_engine)

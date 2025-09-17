@@ -49,9 +49,6 @@ class SQLVariationGenerator(OperatorABC):
         else:
             return "SQL variation generator for Text2SQL tasks."
 
-    def get_create_statements_and_insert_statements(self, db_id: str) -> str:
-        return self.database_manager.get_create_statements_and_insert_statements(db_id)
-
     def parse_response(self, response):
         if not response:
             return ""
@@ -87,7 +84,7 @@ class SQLVariationGenerator(OperatorABC):
         
         for row_idx, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc="Generating SQL Variations"):
             try:
-                create_statements, insert_statements = self.get_create_statements_and_insert_statements(row[self.input_db_id_key])
+                create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(row[self.input_db_id_key])
                 original_sql = row[self.input_sql_key]
 
                 for _ in range(self.num_variations):
