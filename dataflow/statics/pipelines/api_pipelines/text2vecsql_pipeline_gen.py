@@ -118,7 +118,9 @@ class Text2VecSQLGeneration_APIPipeline():
         database_manager = DatabaseManager(
             db_type="sqlite-vec",
             config={
-                "root_path": self.db_root_path
+                "root_path": self.db_root_path,
+                "model_name": "all-MiniLM-L6-v2",
+                "model_path": "./hf_cache/all-MiniLM-L6-v2.e4ce9877.q8_0.gguf"
             },
             logger=None,
             max_connections_per_db=100,
@@ -157,7 +159,7 @@ class Text2VecSQLGeneration_APIPipeline():
         self.sql_execution_classifier_step7 = VecSQLExecutionClassifier(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            num_generations=10,
+            num_generations=3,
             difficulty_thresholds=[2, 5, 9],
             difficulty_labels=['extra', 'hard', 'medium', 'easy']
         )
