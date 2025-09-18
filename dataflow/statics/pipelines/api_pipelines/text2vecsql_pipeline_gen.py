@@ -10,11 +10,11 @@ from dataflow.operators.text2sql import (
     Text2VecSQLPromptGenerator
 )
 from dataflow.operators.text2sql import (
-    VecSQLExecutionFilter
+    SQLExecutionFilter
 )
 from dataflow.operators.text2sql import (
     VecSQLComponentClassifier,
-    VecSQLExecutionClassifier
+    SQLExecutionClassifier
 )
 from dataflow.prompts.text2sql import (
     SelectVecSQLGeneratorPrompt,
@@ -120,7 +120,7 @@ class Text2VecSQLGeneration_APIPipeline():
             config={
                 "root_path": self.db_root_path,
                 "model_name": "all-MiniLM-L6-v2",
-                "model_path": "./hf_cache/all-MiniLM-L6-v2.e4ce9877.q8_0.gguf"
+                "model_path": "/Users/yaodongwen/WorkPlacs/project/DataFlow/dataflow/statics/pipelines/api_pipelines/hf_cache/all-MiniLM-L6-v2.e4ce9877.q8_0.gguf"
             },
             logger=None,
             max_connections_per_db=100,
@@ -134,7 +134,7 @@ class Text2VecSQLGeneration_APIPipeline():
             prompt_template=SelectVecSQLGeneratorPrompt()
         )
 
-        self.sql_execution_filter_step2 = VecSQLExecutionFilter(
+        self.sql_execution_filter_step2 = SQLExecutionFilter(
             database_manager=database_manager,
         )
 
@@ -156,7 +156,7 @@ class Text2VecSQLGeneration_APIPipeline():
             difficulty_labels=['easy', 'medium', 'hard', 'extra']
         )
 
-        self.sql_execution_classifier_step7 = VecSQLExecutionClassifier(
+        self.sql_execution_classifier_step7 = SQLExecutionClassifier(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
             num_generations=3,
