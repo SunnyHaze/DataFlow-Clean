@@ -60,33 +60,6 @@ class VecSQLGenerator(OperatorABC):
 
     def get_create_statements_and_insert_statements(self, db_id: str) -> str:
         return self.database_manager.get_create_statements_and_insert_statements(db_id)
-
-    def count_embedding_columns(self, db_id: str) -> int:
-        """
-        统计数据库中所有表中以 "_embedding" 结尾的列的数量。
-        """
-        count = 0
-        try:
-            # 获取数据库的完整结构信息
-            schema = self.database_manager._get_schema(db_id)
-            
-            # 从schema中获取所有的表信息
-            tables = schema.get('tables', {})
-            
-            # 遍历每一个表
-            for table_name, table_info in tables.items():
-                # 从表信息中获取所有的列名列表
-                columns = table_info.get('columns', [])
-                
-                # 直接遍历列名字符串列表
-                for column_name in columns:
-                    # 检查变量是否为字符串，以及其是否以 "_embedding" 结尾
-                    if isinstance(column_name, str) and column_name.endswith("_embedding"):
-                        count += 1
-                        
-        except Exception as e:
-            self.logger.error(f"Error counting embedding columns for db {db_id}: {e}")
-        return count
     
     def parse_response(self, response):
         if not response:
@@ -115,11 +88,7 @@ class VecSQLGenerator(OperatorABC):
 
         for db_name in tqdm(db_names, desc="Processing Databases"):
             embedding_col_count = self.count_embedding_columns(db_name)
-            if embedding_col_count == 0:
-                self.logger.warning(f"No columns ending with '_embedding' found in database '{db_name}'. Skipping.")
-                continue
-
-            sum_generate_num = embedding_col_count * self.generate_num
+            sum_generate_num = embedding_col_count * self.generate_num         
             self.logger.info(f"Database '{db_name}' has {embedding_col_count} embedding columns. "
                            f"Generating {sum_generate_num} VecSQLs.")
 

@@ -5,15 +5,15 @@ from pathlib import Path
 from huggingface_hub import snapshot_download
 
 from dataflow.operators.text2sql import (
-    VecSQLGenerator,
-    Text2VecSQLQuestionGenerator,
-    Text2VecSQLPromptGenerator
+    SQLGenerator,
+    Text2SQLQuestionGenerator,
+    Text2SQLPromptGenerator
 )
 from dataflow.operators.text2sql import (
     SQLExecutionFilter
 )
 from dataflow.operators.text2sql import (
-    VecSQLComponentClassifier,
+    SQLComponentClassifier,
     SQLExecutionClassifier
 )
 from dataflow.prompts.text2sql import (
@@ -34,7 +34,7 @@ def download_and_extract_database(logger):
     extract_to = "./downloaded_databases_vec"
 
     logger.info(f"Downloading and extracting database from {dataset_repo_id}...")
-    os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+    # os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
     os.makedirs(local_dir, exist_ok=True)
     os.makedirs(extract_to, exist_ok=True)
@@ -127,18 +127,18 @@ class Text2VecSQLGeneration_APIPipeline():
             max_workers=100
         )
         
-        self.sql_generator_step1 = VecSQLGenerator(
+        self.sql_generator_step1 = SQLGenerator(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
             generate_num=3,
-            prompt_template=SelectVecSQLGeneratorPrompt()
+            prompt_template=SelectVecSQLGeneratorPrompt(database_manager, get_logger())
         )
 
         self.sql_execution_filter_step2 = SQLExecutionFilter(
             database_manager=database_manager,
         )
 
-        self.text2sql_question_generator_step3 = Text2VecSQLQuestionGenerator(
+        self.text2sql_question_generator_step3 = Text2SQLQuestionGenerator(
             llm_serving=self.llm_serving,
             embedding_serving=embedding_serving,
             database_manager=database_manager,
@@ -146,12 +146,12 @@ class Text2VecSQLGeneration_APIPipeline():
             prompt_template=Text2VecSQLQuestionGeneratorPrompt()
         )
 
-        self.text2sql_prompt_generator_step4 = Text2VecSQLPromptGenerator(
+        self.text2sql_prompt_generator_step4 = Text2SQLPromptGenerator(
             database_manager=database_manager,
             prompt_template=Text2VecSQLPromptGeneratorPrompt()
         )
 
-        self.sql_component_classifier_step6 = VecSQLComponentClassifier(
+        self.sql_component_classifier_step6 = SQLComponentClassifier(
             difficulty_thresholds=[2, 4, 6],
             difficulty_labels=['easy', 'medium', 'hard', 'extra']
         )
@@ -159,7 +159,7 @@ class Text2VecSQLGeneration_APIPipeline():
         self.sql_execution_classifier_step7 = SQLExecutionClassifier(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            num_generations=3,
+            num_generations=10,
             difficulty_thresholds=[2, 5, 9],
             difficulty_labels=['extra', 'hard', 'medium', 'easy']
         )

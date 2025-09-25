@@ -80,9 +80,16 @@ class SQLGenerator(OperatorABC):
         self.logger.info(f"Generating {self.generate_num} SQLs for each database")
 
         for db_name in tqdm(db_names, desc="Processing Databases"):
+            if self.database_manager.db_type == 'sqlite-vec':
+                embedding_col_count = self.prompt_template.count_embedding_columns(db_name)
+                sum_generate_num = embedding_col_count * self.generate_num         
+                self.logger.info(f"Database '{db_name}' has {embedding_col_count} embedding columns. "
+                            f"Generating {sum_generate_num} VecSQLs.")
+            else:
+                sum_generate_num = self.generate_num
             create_statements, insert_statements = self.get_create_statements_and_insert_statements(db_name)
 
-            for _ in range(self.generate_num):
+            for _ in range(sum_generate_num):
                 prompt = self.prompt_template.build_prompt(
                     insert_statements=insert_statements,
                     create_statements=create_statements,
