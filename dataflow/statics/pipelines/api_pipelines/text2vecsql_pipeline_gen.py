@@ -34,7 +34,7 @@ def download_and_extract_database(logger):
     extract_to = "./downloaded_databases_vec"
 
     logger.info(f"Downloading and extracting database from {dataset_repo_id}...")
-    # os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+    os.environ['HF_ENDPOINT'] = 'https://alpha.hf-mirror.com'
 
     os.makedirs(local_dir, exist_ok=True)
     os.makedirs(extract_to, exist_ok=True)
@@ -131,7 +131,7 @@ class Text2VecSQLGeneration_APIPipeline():
             llm_serving=self.llm_serving,
             database_manager=database_manager,
             generate_num=3,
-            prompt_template=SelectVecSQLGeneratorPrompt(database_manager, get_logger())
+            prompt_template=SelectVecSQLGeneratorPrompt(database_manager)
         )
 
         self.sql_execution_filter_step2 = SQLExecutionFilter(

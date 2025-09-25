@@ -386,14 +386,13 @@ class SelectSQLGeneratorPrompt:
 
 # need database manager to determine if this is vector database
 class SelectVecSQLGeneratorPrompt:
-    def __init__(self, database_manager, logger):
+    def __init__(self, database_manager):
         # --- Start of Modifications ---
         # 移除了所有普通SQL的标准定义(simple_criterion, moderate_criterion等)
         # 只保留VecSQL的标准
         # --- End of Modifications ---
 
         self.database_manager = database_manager
-        self.logger = logger
         
         self.simple_vec_criterion = '''**Criteria:**
         Simple KNN queries in SQLite-vec may satisfy one or more of the following criteria:
@@ -844,10 +843,10 @@ class SelectVecSQLGeneratorPrompt:
                         count += 1
                         
         except Exception as e:
-            self.logger.error(f"Error counting embedding columns for db {db_id}: {e}")
+            print(f"error: Error counting embedding columns for db {db_id}: {e}")
 
         if count == 0:
-                self.logger.warning(f"No columns ending with '_embedding' found in database '{db_id}'.")
+                print(f"error: No columns ending with '_embedding' found in database '{db_id}'.")
         return count
     
     def build_prompt(self, insert_statements: List[str], create_statements: List[str], db_engine: str) -> tuple[str, str]:
@@ -885,6 +884,7 @@ class SelectVecSQLGeneratorPrompt:
             column_count=column_count,
             embedding_model="\'all-MiniLM-L6-v2\'"
         )
+        # print(f"prompt:{prompt}, complexity:{complexity}")
         return prompt, complexity
 
 
