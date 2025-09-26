@@ -130,7 +130,7 @@ class Text2SQLGeneration_APIPipeline():
         self.sql_generator_step1 = SQLGenerator(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            generate_num=5,
+            generate_num=2,
             prompt_template=SelectSQLGeneratorPrompt()
         )
 
