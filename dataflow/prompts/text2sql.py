@@ -187,6 +187,12 @@ class SelectSQLGeneratorPrompt:
         INNER JOIN DepartmentStats dstat ON ds.department_id = dstat.department_id
         ORDER BY ds.level, ds.name;
         ```'''
+        self.complexity2criterion = {
+            "Simple": self.simple_criterion,
+            "Moderate": self.moderate_criterion,
+            "Complex": self.complex_criterion, 
+            "Highly Complex": self.highly_complex_criterion
+        }
 
         self.complexity2criterion = {
             "Simple": self.simple_criterion,
@@ -307,7 +313,6 @@ class SelectSQLGeneratorPrompt:
     def insert_stmts_template(self, insert_statements: str) -> str:
         template = '''### INSERT INTO Statements
         Below are several `INSERT INTO` statements. Use these to help generate predicates (i.e., `WHERE` clauses) in your SQL query:
-        
         {insert_statements}
         '''
         return template.format(insert_statements=insert_statements)
@@ -709,6 +714,7 @@ class Text2SQLPromptGeneratorPrompt:
             question_and_evidence = question
             
         template = """Task Overview:
+<<<<<<< HEAD
         You are a data science expert. Below, you are provided with a database schema and a natural language question. Your task is to understand the schema and generate a valid SQL query to answer the question.
 
         Database Engine:

@@ -14,7 +14,8 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 class Text2SQLPromptGenerator(OperatorABC):
     def __init__(self, 
                 database_manager: DatabaseManager,
-                prompt_template = None
+                prompt_template = None,
+                include_evidence = True
             ):
 
         if prompt_template is None:
@@ -22,6 +23,7 @@ class Text2SQLPromptGenerator(OperatorABC):
         self.prompt_template = prompt_template
         
         self.logger = get_logger()
+        self.include_evidence = include_evidence
         self.database_manager = database_manager
 
     @staticmethod
