@@ -53,7 +53,10 @@ class Text2SQLCotGeneratorPrompt:
         pass
 
     def build_prompt(self, schema_str: str, question: str, sql: str, evidence: str) -> str:
-        question_with_evidence = question + "\n" + evidence
+        if evidence:
+            question_with_evidence = question + "\n" + evidence
+        else:
+            question_with_evidence = question
         prompt = f"""
         You are a senior data analyst specializing in SQL. Your task is to translate a natural language question into an executable SQLite query, providing a detailed reasoning trace.
 
@@ -586,7 +589,7 @@ class Text2SQLQuestionGeneratorPrompt:
 
 class SQLVariationGeneratorPrompt:
     def __init__(self):
-        self.type_prompts = [
+        self.variation_type_prompts = [
             '''
             Data Value Transformations
             - Alter filter conditions, date ranges, or numerical thresholds
@@ -691,7 +694,7 @@ class SQLVariationGeneratorPrompt:
             )
 
         variation_type = random.randint(0, 5)
-        variation_prompt = self.variation_type_prompt(variation_type=variation_type)
+        variation_prompt = self.variation_type_prompts[variation_type]
                     
         prompt = self.sql_variation_prompt(
             original_sql=original_sql,
@@ -713,8 +716,7 @@ class Text2SQLPromptGeneratorPrompt:
         else:
             question_and_evidence = question
             
-        template = """Task Overview:
-<<<<<<< HEAD
+        template = """Task Overview: 
         You are a data science expert. Below, you are provided with a database schema and a natural language question. Your task is to understand the schema and generate a valid SQL query to answer the question.
 
         Database Engine:
