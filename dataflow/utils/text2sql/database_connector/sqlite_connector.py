@@ -46,9 +46,9 @@ class SQLiteConnector(DatabaseConnectorABC):
                 row_count=len(data)
             )
         except Exception as e:
-            self.logger.error(f"Query execution error: {e}")
-            self.logger.error(f"SQL: {sql}")
-            self.logger.error(f"Params: {params}")
+            self.logger.debug(f"Query execution failed (expected during filtering): {e}")
+            self.logger.debug(f"SQL: {sql}")
+            self.logger.debug(f"Params: {params}")
             return QueryResult(
                 success=False,
                 error=str(e)
