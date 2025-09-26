@@ -88,11 +88,7 @@ class SQLiteConnector(DatabaseConnectorABC):
             'insert_statement': []
         }
         
-<<<<<<< HEAD
         result = self.execute_query(connection, f"PRAGMA table_info({table_name})")
-=======
-        result = self.execute_query(connection, "PRAGMA table_info(?)", (table_name,))
->>>>>>> upstream/unified_text2sql
         if result.success:
             for col in result.data:
                 col_name = col['name']
@@ -112,11 +108,7 @@ class SQLiteConnector(DatabaseConnectorABC):
                 if col['pk']:
                     table_info['primary_keys'].append(col_name)
         
-<<<<<<< HEAD
         result = self.execute_query(connection, f"PRAGMA foreign_key_list({table_name})")
-=======
-        result = self.execute_query(connection, "PRAGMA foreign_key_list(?)", (table_name,))
->>>>>>> upstream/unified_text2sql
         if result.success:
             for fk in result.data:
                 table_info['foreign_keys'].append({
