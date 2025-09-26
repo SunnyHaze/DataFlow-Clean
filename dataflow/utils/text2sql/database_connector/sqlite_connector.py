@@ -21,7 +21,17 @@ class SQLiteConnector(DatabaseConnectorABC):
         try:
             cursor = connection.cursor()
             if params:
-                cursor.execute(sql, params)
+                # Ensure params is a tuple and all values are properly formatted
+                if not isinstance(params, (tuple, list)):
+                    params = (params,)
+                # Convert all params to strings and handle None values
+                formatted_params = []
+                for param in params:
+                    if param is None:
+                        formatted_params.append(None)
+                    else:
+                        formatted_params.append(str(param))
+                cursor.execute(sql, tuple(formatted_params))
             else:
                 cursor.execute(sql)
             
@@ -37,6 +47,8 @@ class SQLiteConnector(DatabaseConnectorABC):
             )
         except Exception as e:
             self.logger.error(f"Query execution error: {e}")
+            self.logger.error(f"SQL: {sql}")
+            self.logger.error(f"Params: {params}")
             return QueryResult(
                 success=False,
                 error=str(e)
@@ -76,7 +88,7 @@ class SQLiteConnector(DatabaseConnectorABC):
             'insert_statement': []
         }
         
-        result = self.execute_query(connection, "PRAGMA table_info(?)", (table_name,))
+        result = self.execute_query(connection, f"PRAGMA table_info({table_name})")
         if result.success:
             for col in result.data:
                 col_name = col['name']
@@ -96,7 +108,7 @@ class SQLiteConnector(DatabaseConnectorABC):
                 if col['pk']:
                     table_info['primary_keys'].append(col_name)
         
-        result = self.execute_query(connection, "PRAGMA foreign_key_list(?)", (table_name,))
+        result = self.execute_query(connection, f"PRAGMA foreign_key_list({table_name})")
         if result.success:
             for fk in result.data:
                 table_info['foreign_keys'].append({

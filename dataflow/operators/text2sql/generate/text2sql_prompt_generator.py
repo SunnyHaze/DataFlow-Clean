@@ -14,8 +14,7 @@ from dataflow.utils.text2sql.database_manager import DatabaseManager
 class Text2SQLPromptGenerator(OperatorABC):
     def __init__(self, 
                 database_manager: DatabaseManager,
-                prompt_template = None,
-                include_evidence = True
+                prompt_template = None
             ):
 
         if prompt_template is None:
@@ -23,7 +22,6 @@ class Text2SQLPromptGenerator(OperatorABC):
         self.prompt_template = prompt_template
         
         self.logger = get_logger()
-        self.include_evidence = include_evidence
         self.database_manager = database_manager
 
     @staticmethod
@@ -80,10 +78,7 @@ class Text2SQLPromptGenerator(OperatorABC):
         for item in tqdm(items, desc="Generating prompts"):
             db_id = item[self.input_db_id_key]
             question = item[self.input_question_key]
-            if self.include_evidence:
-                evidence = item[self.input_evidence_key]
-            else:
-                evidence = ""
+            evidence = item[self.input_evidence_key]
                 
             db_id = re.sub(r'[^A-Za-z0-9_]', '', str(db_id).replace('\n', ''))
 

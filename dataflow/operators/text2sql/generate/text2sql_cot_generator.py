@@ -71,7 +71,7 @@ class Text2SQLCoTGenerator(OperatorABC):
         if not generated_sql:
             return None, False
         try:
-            ans = self.database_manager.compare_queries(db_id, generated_sql, gold_sql, 5.0)
+            ans = self.database_manager.compare_queries(db_id, generated_sql, gold_sql)
             
             if ans:
                 return generated_sql, True
@@ -96,9 +96,10 @@ class Text2SQLCoTGenerator(OperatorABC):
                 db_id = item.get(self.input_db_id_key)
                 question = item.get(self.input_question_key)
                 sql = item.get(self.input_sql_key)
+                evidence = item.get(self.input_evidence_key)
                 create_statements, _ = self.database_manager.get_create_statements_and_insert_statements(db_id)
                 schema_str = "\n\n".join(create_statements)
-                cot_prompt = self.prompt_template.build_prompt(schema_str, question, sql)
+                cot_prompt = self.prompt_template.build_prompt(schema_str, question, sql, evidence)
                 prompts.append(cot_prompt)
             
             cot_responses = self.llm_serving.generate_from_input(prompts, "")
@@ -123,7 +124,7 @@ class Text2SQLCoTGenerator(OperatorABC):
                     for (item, response, generated_sql), batch_result in zip(valid_items_with_responses, batch_results):
                         db_id = item.get(self.input_db_id_key)
                         
-                        if batch_result.success and batch_result.data:
+                        if batch_result.get('equal', False):
                             results.append({
                                 **item,
                                 self.output_cot_key: response
@@ -131,8 +132,8 @@ class Text2SQLCoTGenerator(OperatorABC):
                             self.logger.debug(f"Successfully processed {db_id} (Round {retry_round + 1})")
                         else:
                             current_round_failed.append(item)
-                            if batch_result.error:
-                                self.logger.debug(f"SQL comparison failed for {db_id}: {batch_result.error}")
+                            if batch_result.get('differences'):
+                                self.logger.debug(f"SQL comparison failed for {db_id}: {batch_result['differences']}")
                     
                     for item, response in zip(failed_items, cot_responses):
                         if item not in [valid_item for valid_item, _, _ in valid_items_with_responses]:
@@ -171,11 +172,13 @@ class Text2SQLCoTGenerator(OperatorABC):
             input_sql_key: str = "SQL",
             input_question_key: str = "question",
             input_db_id_key: str = "db_id",
+            input_evidence_key: str = "evidence",
             output_cot_key: str = "cot_reasoning"
         ):
         self.input_question_key = input_question_key
         self.input_sql_key = input_sql_key
         self.input_db_id_key = input_db_id_key
+        self.input_evidence_key = input_evidence_key
         self.output_cot_key = output_cot_key
         
         self.logger.info("Starting CoT generation...")

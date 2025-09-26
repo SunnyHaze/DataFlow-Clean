@@ -52,7 +52,8 @@ class Text2SQLCotGeneratorPrompt:
     def __init__(self):
         pass
 
-    def build_prompt(self, schema_str: str, question: str, sql: str) -> str:
+    def build_prompt(self, schema_str: str, question: str, sql: str, evidence: str) -> str:
+        question_with_evidence = question + "\n" + evidence
         prompt = f"""
         You are a senior data analyst specializing in SQL. Your task is to translate a natural language question into an executable SQLite query, providing a detailed reasoning trace.
 
@@ -72,7 +73,7 @@ class Text2SQLCotGeneratorPrompt:
         {schema_str}
 
         [Natural Language Question]:
-        {question}
+        {question_with_evidence}
 
         [Reference Solution]:
         ```sql
@@ -542,15 +543,15 @@ class Text2SQLQuestionGeneratorPrompt:
             instruction = instruction
         )  
 
-    def build_prompt(self, data, input_db_id_key, input_sql_key, styles, db_id2column_info, db_type) -> str:
+    def build_prompt(self, sql, db_id, db_id2column_info, db_type) -> str:
         random.seed(42)
         styles = ["Formal", "Colloquial", "Imperative", "Interrogative", "Descriptive", "Concise", "Vague", "Metaphorical"]
         style_name = random.sample(styles, 1)[0]
-        column_name2column_desc = db_id2column_info[data[input_db_id_key]]
+        column_name2column_desc = db_id2column_info[db_id]
         used_column_name2column_desc = dict()
             
         for column_name, column_desc in column_name2column_desc.items():
-            if column_name.lower() in data[input_sql_key].lower():
+            if column_name.lower() in sql.lower():
                 used_column_name2column_desc[column_name] = column_desc
 
         if style_name in ["Vague", "Metaphorical"]:
@@ -568,7 +569,7 @@ class Text2SQLQuestionGeneratorPrompt:
             style_desc=self.style2desc[style_name].strip(),
             engine=db_type,
             column_info=json.dumps(used_column_name2column_desc, indent=2, ensure_ascii=False).strip(),
-            sql=data[input_sql_key].strip(),
+            sql=sql.strip(),
             steps=steps.strip(),
             guidelines=guidelines.strip(),
             output_format=output_format.strip(),

@@ -109,12 +109,13 @@ class Text2SQLQuestionGenerator(OperatorABC):
     def run(self, storage: DataFlowStorage,
             input_sql_key: str = "sql",
             input_db_id_key: str = "db_id",
-            output_question_key: str = "question"
+            output_question_key: str = "question",
+            output_evidence_key: str = "evidence"
         ):
         self.input_sql_key = input_sql_key
         self.input_db_id_key = input_db_id_key
         self.output_question_key = output_question_key
-        
+        self.output_evidence_key = output_evidence_key
         raw_dataframe = storage.read("dataframe")
         
         existing_data = []
@@ -142,9 +143,8 @@ class Text2SQLQuestionGenerator(OperatorABC):
         
         for data in tqdm(raw_data, desc="Preparing prompts"):
             prompt = self.prompt_template.build_prompt(
-                data,
-                self.input_db_id_key,
-                self.input_sql_key,
+                data[self.input_sql_key],
+                data[self.input_db_id_key],
                 db_id2column_info,
                 self.database_manager.db_type
             )
@@ -196,7 +196,8 @@ class Text2SQLQuestionGenerator(OperatorABC):
                 if best_question:
                     result = {
                         **data,
-                        self.output_question_key: best_question["question"]
+                        self.output_question_key: best_question["question"],
+                        self.output_evidence_key: best_question["external_knowledge"]
                     }
                     processed_results.append(result)
                 else:
@@ -222,4 +223,4 @@ class Text2SQLQuestionGenerator(OperatorABC):
         if self.output_question_key in raw_dataframe.columns:
             return []
         else:
-            return [self.output_question_key]
+            return [self.output_question_key, self.output_evidence_key]
