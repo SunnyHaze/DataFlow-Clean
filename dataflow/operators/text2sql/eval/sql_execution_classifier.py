@@ -27,6 +27,7 @@ class SQLExecutionClassifier(OperatorABC):
             'labels': difficulty_labels
         }
         self.num_generations = num_generations
+        self.timeout = 5.0  # Default timeout for SQL execution
         self.logger = get_logger()
         
         if self.num_generations <= self.difficulty_config["thresholds"][-1]:
@@ -67,7 +68,7 @@ class SQLExecutionClassifier(OperatorABC):
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
     
-    def parse_response(response):
+    def parse_response(self, response):
         pattern = r"```sql\s*(.*?)\s*```"
         
         sql_blocks = re.findall(pattern, response, re.DOTALL)
@@ -193,6 +194,16 @@ class SQLExecutionClassifier(OperatorABC):
                     # pbar.update(len(batch_results))
                 except Exception as e:
                     self.logger.warning(f"Error in batch SQL execution: {e}")
+                    # Add default results for failed batches to ensure all indices are covered
+                    batch_idx = futures.index(future)
+                    batch = batches[batch_idx]
+                    batch_idxs = batch[3]  # Get the indices for this batch
+                    for idx in batch_idxs:
+                        exec_result.append({
+                            "idx": idx,
+                            "cnt_true": 0,
+                            "results": []
+                        })
                     # pbar.update(batch_size)
 
         # pbar.close()

@@ -731,20 +731,6 @@ class SQLComponentClassifier(OperatorABC):
             )
         else:
             return "SQL component difficulty evaluator for Text2SQL tasks."
-
-    def get_schema(self, db):
-        schema = {}
-        conn = sqlite3.connect(db)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = [str(table[0].lower()) for table in cursor.fetchall()]
-
-        for table in tables:
-            cursor.execute("PRAGMA table_info({})".format(table))
-            schema[table] = [str(col[1].lower()) for col in cursor.fetchall()]
-
-        return schema    
     
     def report_statistics(self, dataframe: pd.DataFrame):
         counts = dataframe[self.output_difficulty_key].value_counts()

@@ -80,10 +80,7 @@ class Text2SQLPromptGenerator(OperatorABC):
         for item in tqdm(items, desc="Generating prompts"):
             db_id = item[self.input_db_id_key]
             question = item[self.input_question_key]
-            if self.include_evidence:
-                evidence = item[self.input_evidence_key]
-            else:
-                evidence = ""
+            evidence = item[self.input_evidence_key]
                 
             db_id = re.sub(r'[^A-Za-z0-9_]', '', str(db_id).replace('\n', ''))
 
