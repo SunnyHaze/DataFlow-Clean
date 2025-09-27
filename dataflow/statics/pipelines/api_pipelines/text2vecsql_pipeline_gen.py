@@ -151,12 +151,12 @@ class Text2VecSQLGeneration_APIPipeline():
             prompt_template=Text2VecSQLPromptGeneratorPrompt()
         )
 
-        self.sql_component_classifier_step6 = SQLComponentClassifier(
+        self.sql_component_classifier_step5 = SQLComponentClassifier(
             difficulty_thresholds=[2, 4, 6],
             difficulty_labels=['easy', 'medium', 'hard', 'extra']
         )
 
-        self.sql_execution_classifier_step7 = SQLExecutionClassifier(
+        self.sql_execution_classifier_step6 = SQLExecutionClassifier(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
             num_generations=10,
@@ -204,13 +204,13 @@ class Text2VecSQLGeneration_APIPipeline():
         #     output_cot_key="cot_reasoning"
         # )
 
-        self.sql_component_classifier_step6.run(
+        self.sql_component_classifier_step5.run(
             storage=self.storage.step(),
             input_sql_key=sql_key,
             output_difficulty_key="sql_component_difficulty"
         )
 
-        self.sql_execution_classifier_step7.run(
+        self.sql_execution_classifier_step6.run(
             storage=self.storage.step(),
             input_sql_key=sql_key,
             input_db_id_key=db_id_key,

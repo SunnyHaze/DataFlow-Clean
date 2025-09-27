@@ -42,6 +42,75 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         # 每个实例仍然使用自己的线程本地存储
         self._thread_local = threading.local()
 
+    # def connect(self, connection_info: Dict) -> sqlite3.Connection:
+    #     """
+    #     连接到数据库。为每个调用线程返回一个独立的连接，并确保危险的初始化只进行一次，
+    #     同时为每个连接安全地加载模型到内存中。
+    #     """
+    #     db_path = connection_info.get('path')
+    #     if not db_path:
+    #         raise ValueError("Connection info must contain a 'path' key.")
+
+    #     # 检查当前线程是否已存在此数据库的连接
+    #     if not hasattr(self._thread_local, 'connections'):
+    #         self._thread_local.connections = {}
+    #     if db_path in self._thread_local.connections:
+    #         return self._thread_local.connections[db_path]
+
+    #     # 线程安全地获取或创建“初始化/加载”锁
+    #     with self._class_lock:
+    #         if db_path not in self._db_init_locks:
+    #             self._db_init_locks[db_path] = threading.Lock()
+        
+    #     init_lock = self._db_init_locks[db_path]
+
+    #     # 步骤 1: 一次性初始化（确保模型已写入DB文件）
+    #     # 这个代码块在每个进程中只对一个DB文件执行一次。
+    #     with init_lock:
+    #         if db_path not in self._initialized_dbs:
+    #             self.logger.info(f"'{db_path}' is not initialized in this process. Performing one-time disk setup...")
+    #             self._initialize_database_disk_state(connection_info)
+    #             self._initialized_dbs.add(db_path)
+
+    #     # 步骤 2: 为当前线程创建自己的连接
+    #     self.logger.debug(f"Thread {threading.get_ident()} creating new DB connection for '{db_path}'...")
+    #     conn = sqlite3.connect(
+    #         db_path,
+    #         timeout=30.0,
+    #         check_same_thread=False
+    #     )
+    #     conn.row_factory = sqlite3.Row
+        
+    #     # 步骤 3: 为每个新连接加载/激活模型到内存
+    #     # 即使模型已在DB文件中，每个连接也需要被告知去加载它。
+    #     # 为了防止并发调用C扩展导致崩溃，我们用同一个锁来序列化这个加载过程。
+    #     model_name = connection_info.get('model_name')
+    #     model_path = connection_info.get('model_path')
+    #     with init_lock:
+    #         self.logger.debug(f"Configuring connection for thread {threading.get_ident()}...")
+    #         conn.enable_load_extension(True)
+    #         sqlite_vec.load(conn)
+    #         sqlite_lembed.load(conn)
+
+    #         if model_name and model_path:
+    #             self.logger.debug(f"Activating model '{model_name}' for connection on thread {threading.get_ident()}...")
+    #             register_sql = """
+    #             INSERT OR IGNORE INTO main.lembed_models (name, model)
+    #             VALUES (?, lembed_model_from_file(?))
+    #             """
+    #             try:
+    #                 # 这个操作现在是线程安全的。第一个线程会从文件加载模型并写入DB。
+    #                 # 后续线程也会尝试，但`INSERT OR IGNORE`会跳过写入，
+    #                 # 同时`lembed_model_from_file`会将其加载到当前连接的内存中。
+    #                 conn.execute(register_sql, (model_name, model_path))
+    #                 conn.commit()
+    #             except Exception as e:
+    #                 self.logger.error(f"Failed to activate model '{model_name}' on new connection: {e}", exc_info=True)
+    #                 raise
+
+    #     self._thread_local.connections[db_path] = conn
+    #     self.logger.debug(f"Connection for thread {threading.get_ident()} created and configured successfully.")
+    #     return conn
     def connect(self, connection_info: Dict) -> sqlite3.Connection:
         """
         连接到数据库。为每个调用线程返回一个独立的连接，并确保危险的初始化只进行一次，
@@ -57,16 +126,10 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         if db_path in self._thread_local.connections:
             return self._thread_local.connections[db_path]
 
-        # 线程安全地获取或创建“初始化/加载”锁
-        with self._class_lock:
-            if db_path not in self._db_init_locks:
-                self._db_init_locks[db_path] = threading.Lock()
-        
-        init_lock = self._db_init_locks[db_path]
-
         # 步骤 1: 一次性初始化（确保模型已写入DB文件）
         # 这个代码块在每个进程中只对一个DB文件执行一次。
-        with init_lock:
+        # 使用类级别的锁来确保下面的检查和 _initialize_database_disk_state 调用是线程安全的。
+        with self._class_lock:
             if db_path not in self._initialized_dbs:
                 self.logger.info(f"'{db_path}' is not initialized in this process. Performing one-time disk setup...")
                 self._initialize_database_disk_state(connection_info)
@@ -80,26 +143,29 @@ class SQLiteVecConnector(DatabaseConnectorABC):
             check_same_thread=False
         )
         conn.row_factory = sqlite3.Row
-        conn.enable_load_extension(True)
-        sqlite_vec.load(conn)
-        sqlite_lembed.load(conn)
         
-        # 步骤 3: 为每个新连接加载/激活模型到内存
-        # 即使模型已在DB文件中，每个连接也需要被告知去加载它。
-        # 为了防止并发调用C扩展导致崩溃，我们用同一个锁来序列化这个加载过程。
+        # 步骤 3: 为每个新连接加载扩展并激活模型（使用进程安全的FileLock）
         model_name = connection_info.get('model_name')
         model_path = connection_info.get('model_path')
-        if model_name and model_path:
-            with init_lock:
-                self.logger.debug(f"Activating model '{model_name}' for connection on thread {threading.get_ident()}...")
+
+        # 使用文件锁来确保跨多进程的安全性，防止并发调用C扩展导致崩溃
+        lock_path = db_path + ".lock"
+        file_lock = FileLock(lock_path, timeout=120)
+
+        with file_lock:
+            self.logger.debug(f"Process-safe lock acquired by thread {threading.get_ident()}. Configuring connection...")
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            sqlite_lembed.load(conn)
+
+            if model_name and model_path:
+                self.logger.debug(f"Activating model '{model_name}' for connection...")
                 register_sql = """
                 INSERT OR IGNORE INTO main.lembed_models (name, model)
                 VALUES (?, lembed_model_from_file(?))
                 """
                 try:
-                    # 这个操作现在是线程安全的。第一个线程会从文件加载模型并写入DB。
-                    # 后续线程也会尝试，但`INSERT OR IGNORE`会跳过写入，
-                    # 同时`lembed_model_from_file`会将其加载到当前连接的内存中。
+                    # 这个操作现在是进程和线程安全的。
                     conn.execute(register_sql, (model_name, model_path))
                     conn.commit()
                 except Exception as e:
@@ -109,7 +175,6 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         self._thread_local.connections[db_path] = conn
         self.logger.debug(f"Connection for thread {threading.get_ident()} created and configured successfully.")
         return conn
-
     def _initialize_database_disk_state(self, connection_info: Dict):
         """
         这个方法只负责一次性的、持久化到磁盘的设置。
