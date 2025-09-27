@@ -51,9 +51,6 @@ class SQLGenerator(OperatorABC):
         else:
             return "SQL generator for Text2SQL tasks."
 
-    def get_create_statements_and_insert_statements(self, db_id: str) -> str:
-        return self.database_manager.get_create_statements_and_insert_statements(db_id)
-
     def parse_response(self, response):
         if not response:
             return ""  
@@ -87,7 +84,7 @@ class SQLGenerator(OperatorABC):
                             f"Generating {sum_generate_num} VecSQLs.")
             else:
                 sum_generate_num = self.generate_num
-            create_statements, insert_statements = self.get_create_statements_and_insert_statements(db_name)
+            create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(db_name)
 
             for _ in range(sum_generate_num):
                 prompt, _ = self.prompt_template.build_prompt(

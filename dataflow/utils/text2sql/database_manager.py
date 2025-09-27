@@ -93,15 +93,14 @@ class DatabaseManager:
         # 'postgres': PostgresConnector
     }
     
-    def __init__(self, db_type: str = "sqlite", config: Optional[Dict] = None, 
-             logger=None, max_connections_per_db: int = 100, 
-             max_workers: int = None, sql_execution_timeout: int = 5):
+    def __init__(self, db_type: str = "sqlite", config: Optional[Dict] = None):
         self.db_type = db_type.lower()
         self.config = config or {}
-        self.logger = logger or get_logger()
-        self.max_connections_per_db = max_connections_per_db
-        self.max_workers = max_workers or min(64, max(32, os.cpu_count()))
-        self.query_timeout = sql_execution_timeout
+
+        self.logger = get_logger()
+        self.max_connections_per_db = 100
+        self.max_workers = min(64, max(32, os.cpu_count()))
+        self.query_timeout = 5
         
         if self.db_type not in self.CONNECTORS:
             raise ValueError(f"Unsupported database type: {self.db_type}")
@@ -111,20 +110,6 @@ class DatabaseManager:
         self.cache = CacheManager()
         
         self._discover_databases()
-
-    def __del__(self):
-        """Clean up resources when object is destroyed"""
-        try:
-            self.close()
-        except Exception:
-            pass  # Ignore errors during cleanup
-
-    def close(self):
-        """Close all connections and clear cache"""
-        if hasattr(self, 'cache'):
-            self.cache.clear()
-        if hasattr(self, 'databases'):
-            self.databases.clear()
 
 
     # ============== Database Discovery ==============
@@ -288,10 +273,15 @@ class DatabaseManager:
             )
             return comparison
         
-        # Compare data
+        # Compare data - use a simpler approach that avoids None comparison issues
         def normalize_row(row):
-            return tuple(sorted((k, str(v) if v is not None else None) 
-                              for k, v in row.items()))
+            """Normalize row data, converting None to empty string to avoid comparison issues"""
+            normalized_items = []
+            for k, v in row.items():
+                # Convert None to empty string to avoid comparison issues
+                normalized_value = "" if v is None else str(v)
+                normalized_items.append((k, normalized_value))
+            return tuple(sorted(normalized_items))
         
         data1 = sorted([normalize_row(row) for row in result1.data])
         data2 = sorted([normalize_row(row) for row in result2.data])

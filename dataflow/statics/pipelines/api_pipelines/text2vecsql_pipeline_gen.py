@@ -121,10 +121,7 @@ class Text2VecSQLGeneration_APIPipeline():
                 "root_path": self.db_root_path,
                 "model_name": "all-MiniLM-L6-v2",
                 "model_path": "/Users/yaodongwen/WorkPlacs/project/DataFlow/dataflow/statics/pipelines/api_pipelines/hf_cache/all-MiniLM-L6-v2.e4ce9877.q8_0.gguf"
-            },
-            logger=None,
-            max_connections_per_db=100,
-            max_workers=100
+            }
         )
         
         self.sql_generator_step1 = SQLGenerator(

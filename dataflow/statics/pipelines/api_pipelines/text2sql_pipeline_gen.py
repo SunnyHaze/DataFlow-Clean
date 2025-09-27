@@ -34,6 +34,11 @@ def download_and_extract_database(logger):
     
     logger.info(f"Downloading and extracting database from {dataset_repo_id}...")
     os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+
+    db_exp_folder_path = os.path.join(extract_to, "databases")
+
+    if os.path.exists(db_exp_folder_path):
+        return db_exp_folder_path
     
     os.makedirs(local_dir, exist_ok=True)
     os.makedirs(extract_to, exist_ok=True)
@@ -52,7 +57,7 @@ def download_and_extract_database(logger):
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_to)
         logger.info(f"Database files extracted to {extract_to}")
-        return extract_to
+        return db_exp_folder_path
     else:
         raise FileNotFoundError(f"Database zip file not found at {zip_path}")
 
@@ -82,20 +87,20 @@ class Text2SQLGeneration_APIPipeline():
         )
 
         self.llm_serving = APILLMServing_request(
-            api_url="http://api.openai.com/v1/chat/completions",
+            api_url="http://123.129.219.111:3000/v1/chat/completions",
             model_name="gpt-4o",
             max_workers=100
         )
 
         # It is recommended to use better LLMs for the generation of Chain-of-Thought (CoT) reasoning process.
         cot_generation_api_llm_serving = APILLMServing_request(
-            api_url="http://api.openai.com/v1/chat/completions",
+            api_url="http://123.129.219.111:3000/v1/chat/completions",
             model_name="gpt-4o", # You can change to a more powerful model for CoT generation
             max_workers=100
         )
 
         embedding_serving = APILLMServing_request(
-            api_url="http://api.openai.com/v1/embeddings",
+            api_url="http://123.129.219.111:3000/v1/embeddings",
             model_name="text-embedding-ada-002",
             max_workers=100
         )
@@ -125,12 +130,12 @@ class Text2SQLGeneration_APIPipeline():
         self.sql_generator_step1 = SQLGenerator(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            generate_num=50,
+            generate_num=2,
             prompt_template=SelectSQLGeneratorPrompt()
         )
 
         self.sql_execution_filter_step2 = SQLExecutionFilter(
-            database_manager=database_manager,
+            database_manager=database_manager
         )
 
         self.text2sql_question_generator_step3 = Text2SQLQuestionGenerator(
@@ -149,8 +154,6 @@ class Text2SQLGeneration_APIPipeline():
         self.sql_cot_generator_step5 = Text2SQLCoTGenerator(
             llm_serving=cot_generation_api_llm_serving,
             database_manager=database_manager,
-            max_retries=3,
-            enable_retry=True,
             prompt_template=Text2SQLCotGeneratorPrompt()
         )
 
@@ -172,6 +175,7 @@ class Text2SQLGeneration_APIPipeline():
         sql_key = "SQL"
         db_id_key = "db_id"
         question_key = "question"
+        evidence_key = "evidence"
 
         self.sql_generator_step1.run(
             storage=self.storage.step(),
@@ -189,13 +193,15 @@ class Text2SQLGeneration_APIPipeline():
             storage=self.storage.step(),
             input_sql_key=sql_key,
             input_db_id_key=db_id_key,
-            output_question_key=question_key
+            output_question_key=question_key,
+            output_evidence_key=evidence_key
         )
 
         self.text2sql_prompt_generator_step4.run(
             storage=self.storage.step(),
             input_question_key=question_key,
             input_db_id_key=db_id_key,
+            input_evidence_key=evidence_key,
             output_prompt_key="prompt"
         )
 
@@ -204,6 +210,7 @@ class Text2SQLGeneration_APIPipeline():
             input_sql_key=sql_key,
             input_question_key=question_key,
             input_db_id_key=db_id_key,
+            input_evidence_key=evidence_key,
             output_cot_key="cot_reasoning"
         )
 
