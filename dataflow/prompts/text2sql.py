@@ -397,10 +397,12 @@ class SelectSQLGeneratorPrompt:
 
 
 class SelectVecSQLGeneratorPrompt:
-    def __init__(self, database_manager):
+    def __init__(self):
+        # --- Start of Modifications ---
+        # 移除了所有普通SQL的标准定义(simple_criterion, moderate_criterion等)
+        # 只保留VecSQL的标准
+        # --- End of Modifications ---
 
-        self.database_manager = database_manager
-        
         self.simple_vec_criterion = '''**Criteria:**
         Simple KNN queries in SQLite-vec may satisfy one or more of the following criteria:
         - Basic vector similarity search on a single table
@@ -825,36 +827,6 @@ class SelectVecSQLGeneratorPrompt:
             column_count=column_count,
             embedding_model=embedding_model
         )
-
-    def count_embedding_columns(self, db_id: str) -> int:
-        """
-        统计数据库中所有表中以 "_embedding" 结尾的列的数量。
-        """
-        count = 0
-        try:
-            # 获取数据库的完整结构信息
-            schema = self.database_manager._get_schema(db_id)
-            
-            # 从schema中获取所有的表信息
-            tables = schema.get('tables', {})
-            
-            # 遍历每一个表
-            for table_name, table_info in tables.items():
-                # 从表信息中获取所有的列名列表
-                columns = table_info.get('columns', [])
-                
-                # 直接遍历列名字符串列表
-                for column_name in columns:
-                    # 检查变量是否为字符串，以及其是否以 "_embedding" 结尾
-                    if isinstance(column_name, str) and column_name.endswith("_embedding"):
-                        count += 1
-                        
-        except Exception as e:
-            print(f"error: Error counting embedding columns for db {db_id}: {e}")
-
-        if count == 0:
-                print(f"error: No columns ending with '_embedding' found in database '{db_id}'.")
-        return count
     
     def build_prompt(self, insert_statements: List[str], create_statements: List[str], db_engine: str) -> tuple[str, str]:
         random.seed(42)

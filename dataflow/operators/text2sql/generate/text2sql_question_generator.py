@@ -105,7 +105,7 @@ class Text2SQLQuestionGenerator(OperatorABC):
             distance_sums = distance_matrix.sum(axis=1)
             min_index = np.argmin(distance_sums)
             return question_candidates[min_index]
-
+    
     def run(self, storage: DataFlowStorage,
             input_sql_key: str = "sql",
             input_db_id_key: str = "db_id",

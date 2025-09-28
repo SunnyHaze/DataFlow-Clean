@@ -5,7 +5,7 @@ from pathlib import Path
 from huggingface_hub import snapshot_download
 
 from dataflow.operators.text2sql import (
-    SQLGenerator,
+    SQLByColumnGenerator,
     Text2SQLQuestionGenerator,
     Text2SQLPromptGenerator
 )
@@ -34,7 +34,7 @@ def download_and_extract_database(logger):
     extract_to = "./downloaded_databases_vec"
 
     logger.info(f"Downloading and extracting database from {dataset_repo_id}...")
-    os.environ['HF_ENDPOINT'] = 'https://alpha.hf-mirror.com'
+    # os.environ['HF_ENDPOINT'] = 'https://alpha.hf-mirror.com'
 
     os.makedirs(local_dir, exist_ok=True)
     os.makedirs(extract_to, exist_ok=True)
@@ -120,15 +120,15 @@ class Text2VecSQLGeneration_APIPipeline():
             config={
                 "root_path": self.db_root_path,
                 "model_name": "all-MiniLM-L6-v2",
-                "model_path": "/Users/yaodongwen/WorkPlacs/project/DataFlow/dataflow/statics/pipelines/api_pipelines/hf_cache/all-MiniLM-L6-v2.e4ce9877.q8_0.gguf"
+                "model_path": "./hf_cache/all-MiniLM-L6-v2.e4ce9877.q8_0.gguf"
             }
         )
         
-        self.sql_generator_step1 = SQLGenerator(
+        self.sql_generator_step1 = SQLByColumnGenerator(
             llm_serving=self.llm_serving,
             database_manager=database_manager,
-            generate_num=3,
-            prompt_template=SelectVecSQLGeneratorPrompt(database_manager)
+            generate_num=2,
+            prompt_template=SelectVecSQLGeneratorPrompt()
         )
 
         self.sql_execution_filter_step2 = SQLExecutionFilter(

@@ -473,3 +473,33 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         
         return databases
 
+    def _get_number_of_special_column(self, connection: sqlite3.Connection) -> int:
+        """
+        get the number of vector columns in database
+        """
+        count = 0
+        try:
+            # 获取数据库的完整结构信息
+            schema = self.get_schema_info(connection)
+            
+            # 从schema中获取所有的表信息
+            tables = schema.get('tables', {})
+            
+            # 遍历每一个表
+            for table_name, table_info in tables.items():
+                # 从表信息中获取所有的列名列表
+                columns = table_info.get('columns', [])
+                
+                # 直接遍历列名字符串列表
+                for column_name in columns:
+                    # 检查变量是否为字符串，以及其是否以 "_embedding" 结尾
+                    if isinstance(column_name, str) and column_name.endswith("_embedding"):
+                        count += 1
+                        
+        except Exception as e:
+            print(f"error: Error counting embedding columns {e}")
+
+        if count == 0:
+                print(f"error: No columns ending with '_embedding'.")
+        return count 
+
