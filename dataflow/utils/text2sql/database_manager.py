@@ -381,3 +381,9 @@ class DatabaseManager:
             'result1_success': False,
             'result2_success': False,
         }
+    
+    def get_number_of_special_column(self, db_id):
+        """get the number of secial column"""
+        with self.get_connection(db_id) as conn:
+            return self.connector._get_number_of_special_column(conn)
+
