@@ -12,7 +12,7 @@ class KBCleaningPDF_APIPipeline():
     def __init__(self):
 
         self.storage = FileStorage(
-            first_entry_file_name="../example_data/KBCleaningPipeline/kbc_text_1.jsonl",
+            first_entry_file_name="../example_data/KBCleaningPipeline/kbc_test_1.jsonl",
             cache_path="./.cache/api",
             file_name_prefix="pdf_cleaning_step",
             cache_type="json",
