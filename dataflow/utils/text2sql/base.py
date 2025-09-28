@@ -47,7 +47,12 @@ class DatabaseConnectorABC(ABC):
     def discover_databases(self, config: Dict) -> Dict[str, DatabaseInfo]:
         """Discover available databases"""
         pass
-    
+
+    @abstractmethod
+    def _get_number_of_special_column(self, connection: Any):
+        """Get number of column which has spicial meaning"""
+        pass
+
     def validate_connection(self, connection: Any) -> bool:
         """Check if connection is still valid"""
         try:
