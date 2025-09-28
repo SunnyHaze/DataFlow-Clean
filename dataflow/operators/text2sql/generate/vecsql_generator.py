@@ -87,21 +87,27 @@ class VecSQLGenerator(OperatorABC):
         self.logger.info(f"Generating VecSQLs for each database based on embedding columns")
 
         for db_name in tqdm(db_names, desc="Processing Databases"):
+            create_statements, insert_statements = self.get_create_statements_and_insert_statements(db_name)
+
+
+
+
+
             embedding_col_count = self.count_embedding_columns(db_name)
             sum_generate_num = embedding_col_count * self.generate_num         
             self.logger.info(f"Database '{db_name}' has {embedding_col_count} embedding columns. "
                            f"Generating {sum_generate_num} VecSQLs.")
 
-            create_statements, insert_statements = self.get_create_statements_and_insert_statements(db_name)
+
 
             for _ in range(sum_generate_num):
-                # Unpack the tuple here, taking only the first element (the prompt string)
-                prompt, _ = self.prompt_template.build_prompt(
-                    insert_statements=insert_statements,
-                    create_statements=create_statements,
-                    db_engine=self.database_manager.db_type
-                )
-                prompts.append({"prompt": prompt, "db_id": db_name})
+            prompt_list, _ = self.prompt_template.build_prompt(
+                insert_statements=insert_statements,
+                create_statements=create_statements,
+                generate_num=self.generate_num,
+                db_engine=self.database_manager.db_type
+            )
+            prompts.append({"prompt": prompt, "db_id": db_name})
 
         if not prompts:
             self.logger.warning("No prompts generated, please check the database path and file")

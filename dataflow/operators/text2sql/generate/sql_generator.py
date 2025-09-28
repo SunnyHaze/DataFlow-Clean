@@ -1,7 +1,4 @@
-import os
 import random
-from typing import Dict, List, Optional
-import numpy as np
 import pandas as pd
 import re
 from dataflow.prompts.text2sql import SelectSQLGeneratorPrompt
@@ -84,6 +81,7 @@ class SQLGenerator(OperatorABC):
                             f"Generating {sum_generate_num} VecSQLs.")
             else:
                 sum_generate_num = self.generate_num
+
             create_statements, insert_statements = self.database_manager.get_create_statements_and_insert_statements(db_name)
 
             for _ in range(sum_generate_num):
