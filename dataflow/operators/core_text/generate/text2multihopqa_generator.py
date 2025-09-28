@@ -1,4 +1,4 @@
-from dataflow.prompts.multihopqa import MultiHopQAGeneratorPrompt
+from dataflow.prompts.text2qa import Text2MultiHopQAGeneratorPrompt
 import pandas as pd
 from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow import get_logger
@@ -16,7 +16,7 @@ from dataflow.core.prompt import prompt_restrict
 
 import re
 @prompt_restrict(
-    MultiHopQAGeneratorPrompt       
+    Text2MultiHopQAGeneratorPrompt       
 )
 
 @OPERATOR_REGISTRY.register()
@@ -33,7 +33,8 @@ class Text2MultiHopQAGenerator(OperatorABC):
                  llm_serving: LLMServingABC,
                  seed: int = 0,
                  lang="en",
-                 prompt_template = None
+                 prompt_template = None,
+                 num_q = 5
                  ):
         r"""Initialize the UserDataProcessor.
 
@@ -45,10 +46,12 @@ class Text2MultiHopQAGenerator(OperatorABC):
         self.llm_serving = llm_serving
         self.lang = lang
         self.logger = get_logger()
+        self.num_q = num_q
+
         if prompt_template:
             self.prompt_template = prompt_template
         else:
-            self.prompt_template = MultiHopQAGeneratorPrompt()
+            self.prompt_template = Text2MultiHopQAGeneratorPrompt()
 
     @staticmethod
     def get_desc(lang: str = "zh") -> tuple:
@@ -213,16 +216,22 @@ class Text2MultiHopQAGenerator(OperatorABC):
         
     def run(
             self,
-            input_key:str='',
-            output_key:str='',
+            input_key:str='cleaned_chunk',
+            output_key:str='QA_pairs',
+            output_meta_key:str='QA_metadata',
             storage: DataFlowStorage=None,
     ):
-        self.input_key, self.output_key = input_key, output_key
+        self.input_key, self.output_key, self.output_meta_key = input_key, output_key, output_meta_key
         dataframe = storage.read("dataframe")
         self._validate_dataframe(dataframe)
         texts = dataframe[self.input_key].tolist()
-        qa_pairs=self.process_batch(texts)
-        dataframe[self.output_key] = qa_pairs
+        outputs=self.process_batch(texts)
+        dataframe[self.output_key] = [
+            output['qa_pairs'][:self.num_q] if len(output['qa_pairs']) >= self.num_q else output['qa_pairs']
+            for output in outputs
+        ]
+
+        dataframe[self.output_meta_key] = [output['metadata'] for output in outputs]
         output_file = storage.write(dataframe)
         self.logger.info(f"Results saved to {output_file}")
 
@@ -256,11 +265,11 @@ class ExampleConstructor:
         self.logger = get_logger()
         self.max_length = max_text_length
         self.min_length = min_text_length
-        # self.prompt = MultiHopQAGeneratorPrompt(lang=self.lang)
+        # self.prompt = Text2MultiHopQAGeneratorPrompt(lang=self.lang)
         if prompt_template:
             self.prompt_template = prompt_template
         else:
-            self.prompt_template = MultiHopQAGeneratorPrompt()
+            self.prompt_template = Text2MultiHopQAGeneratorPrompt()
 
     def construct_examples(
         self, raw_data: List[Dict[str, Any]]

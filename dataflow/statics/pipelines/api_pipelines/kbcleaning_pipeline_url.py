@@ -1,6 +1,6 @@
 from dataflow.operators.knowledge_cleaning import (
     KBCChunkGenerator,
-    FileOrURLToMarkdownConverter,
+    FileOrURLToMarkdownConverterBatch,
     KBCTextCleaner,
     # KBCMultiHopQAGenerator,
 )
@@ -12,7 +12,7 @@ class KBCleaningURL_APIPipeline():
     def __init__(self, url:str=None, raw_file:str=None):
 
         self.storage = FileStorage(
-            first_entry_file_name="../example_data/KBCleaningPipeline/kbc_placeholder.json",
+            first_entry_file_name="../example_data/KBCleaningPipeline/kbc_test_1.jsonl",
             cache_path="./.cache/api",
             file_name_prefix="url_cleaning_step",
             cache_type="json",
@@ -24,11 +24,10 @@ class KBCleaningURL_APIPipeline():
                 max_workers=100
         )
 
-        self.knowledge_cleaning_step1 = FileOrURLToMarkdownConverter(
+        self.knowledge_cleaning_step1 = FileOrURLToMarkdownConverterBatch(
             intermediate_dir="../example_data/KBCleaningPipeline/raw/",
             lang="en",
             mineru_backend="vlm-sglang-engine",
-            url = url,
         )
 
         self.knowledge_cleaning_step2 = KBCChunkGenerator(
@@ -44,33 +43,36 @@ class KBCleaningURL_APIPipeline():
 
         self.knowledge_cleaning_step4 = Text2MultiHopQAGenerator(
             llm_serving=self.llm_serving,
-            lang="en"
+            lang="en",
+            num_q = 5
         )
 
     def forward(self):
-        extracted=self.knowledge_cleaning_step1.run(
-            storage=self.storage,
+        self.knowledge_cleaning_step1.run(
+            storage=self.storage.step(),
+            # input_key=,
+            # output_key=,
         )
         
         self.knowledge_cleaning_step2.run(
             storage=self.storage.step(),
-            input_file=extracted,
-            output_key="raw_content",
+            # input_key=,
+            # output_key=,
         )
 
         self.knowledge_cleaning_step3.run(
             storage=self.storage.step(),
-            input_key= "raw_content",
-            output_key="cleaned",
+            # input_key=,
+            # output_key=,
         )
 
         self.knowledge_cleaning_step4.run(
             storage=self.storage.step(),
-            input_key="cleaned",
-            output_key="MultiHop_QA"
+            # input_key=,
+            # output_key=,
         )
 
 if __name__ == "__main__":
-    model = KBCleaningURL_APIPipeline(url="https://trafilatura.readthedocs.io/en/latest/quickstart.html")
+    model = KBCleaningURL_APIPipeline()
     model.forward()
 

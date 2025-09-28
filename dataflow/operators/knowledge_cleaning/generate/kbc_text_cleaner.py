@@ -110,8 +110,8 @@ class KBCTextCleaner(OperatorABC):
     def run(
         self, 
         storage: DataFlowStorage, 
-        input_key:str = "raw_content", 
-        output_key:str = "cleaned"
+        input_key:str = "raw_chunk", 
+        output_key:str = "cleaned_chunk"
         ):
         '''
         Runs the knowledge cleaning process, reading from the input key and saving results to output key.
