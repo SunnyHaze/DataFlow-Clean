@@ -201,7 +201,7 @@ class FileOrURLToMarkdownConverterBatch(OperatorABC):
                 "- Generates intermediate files to specified directory(intermediate_dir)"
             )
 
-    def run(self, storage: DataFlowStorage, input_key: str = "raw_file_path", output_key: str = "text_path"):
+    def run(self, storage: DataFlowStorage, input_key: str = "source", output_key: str = "text_path"):
         self.logger.info("Starting content extraction...")
         self.logger.info("If the input is a URL or a large file, this process might take some time. Please wait...")
 
