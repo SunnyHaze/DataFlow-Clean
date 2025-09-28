@@ -6,6 +6,8 @@ from dataflow.utils.storage import DataFlowStorage
 from dataflow.core import OperatorABC
 from dataflow.core import LLMServingABC
 from dataflow.core.prompt import prompt_restrict
+import ast
+import json
 
 from dataflow.prompts.text2qa import Text2QASeedQuestionGeneratorPrompt,Text2QAAutoPromptGeneratorPrompt
 
@@ -80,10 +82,18 @@ class Text2QAGenerator:
         a = next((line[2:].strip() for line in lines if line.lower().startswith("a:")), "")
         return q, a
 
+    def parse_list_string(self, s: str) -> list:
+        # 去掉前后的 [ ]
+        s = s.strip()[1:-1]
+        # 去掉多余逗号并按 , 切分
+        items = [item.strip() for item in s.split(",") if item.strip()]
+        return items
+
     def run(
         self, 
         storage: DataFlowStorage, 
         input_key:str = "text", 
+        input_question_num:int = 1,
         output_prompt_key:str = "generated_prompt",
         output_quesion_key:str = "generated_question",
         output_answer_key:str = "generated_answer"
@@ -92,14 +102,24 @@ class Text2QAGenerator:
         Runs the QA generation process, reading from the input file and saving results to output.
         '''
 
-        self.input_key, self.output_prompt_key, self.output_question_key, self.output_answer_key = input_key, output_prompt_key, output_quesion_key, output_answer_key
+        self.input_key, self.input_question_num, self.output_prompt_key, self.output_question_key, self.output_answer_key = input_key, input_question_num, output_prompt_key, output_quesion_key, output_answer_key
 
         dataframe = storage.read("dataframe")
         self._validate_dataframe(dataframe)
         formatted_prompts = self._build_prompt(dataframe, "prompt")
         prompts = self.llm_serving.generate_from_input(user_inputs=formatted_prompts, system_prompt="")
+        prompts = [json.loads(p) for p in prompts]
 
-        dataframe[self.output_prompt_key] = prompts
+        expanded_rows = []
+        expanded_prompts = []
+
+        for idx, prompt_list in enumerate(prompts):
+            for p in prompt_list[:min(self.input_question_num,len(prompt_list))]:
+                expanded_rows.append(dataframe.iloc[idx].to_dict())  # 复制该行
+                expanded_prompts.append(p)  # 对应的 prompt
+
+        dataframe = pd.DataFrame(expanded_rows)
+        dataframe[self.output_prompt_key] = expanded_prompts
 
         formatted_prompts = self._build_prompt(dataframe, "qa")
         responses = self.llm_serving.generate_from_input(user_inputs=formatted_prompts, system_prompt="")

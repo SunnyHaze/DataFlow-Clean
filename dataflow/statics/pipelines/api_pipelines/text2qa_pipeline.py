@@ -47,6 +47,7 @@ class AgenticRAG_APIPipeline():
         self.text2qa_generator_step3.run(
             storage = self.storage.step(),
             input_key="text",
+            input_question_num= 3,
             output_prompt_key="generated_prompt",
             output_quesion_key="generated_question",
             output_answer_key="generated_answer"

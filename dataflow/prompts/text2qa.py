@@ -14,7 +14,7 @@ class Text2QAAutoPromptGeneratorPrompt(PromptABC):
 
     def build_prompt(self, seed_data: str) -> str:
         prompt = f'''You will be given a piece of seed data, which may consist of a paragraph, dialogue, or any other form of text containing potential question-answer information.
-Your task is to analyze this seed data carefully and generate a clear and effective prompt that can be used to instruct a language model to extract a single high-quality question-answer (QA) pair suitable for reinforcement learning (RL) training from this piece of data.
+Your task is to analyze this seed data carefully and generate as much non-repeat clear and effective prompt as you can that can be used to instruct a language model to extract a single high-quality question-answer (QA) pair suitable for reinforcement learning (RL) training from this piece of data.
 
 The generated prompt should:
 Clearly describe the type and format of input the model will receive;
@@ -30,7 +30,8 @@ Both the question and answer should be simple enough to facilitate evaluation an
 
 Don't include any additional explanations or comments in your output.
 Don't repeat the seed data in your output.
-Don't output the formatting instructions, just the prompt itself.
+Your output format should be in a list as follow:
+["PROMPT_1","PROMPT_2",...]
 Here is the seed data you need to analyze and generate a prompt for:\n{seed_data}'''
 
         return prompt
