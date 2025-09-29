@@ -77,9 +77,6 @@ class CacheManager:
             del self._timestamps[key]
 
 
-
-
-
 # ============== Database Manager ==============
 class DatabaseManager:
     
@@ -143,7 +140,7 @@ class DatabaseManager:
     # ============== SQL Execution ==============
 
     def execute_query(self, db_id: str, sql: str, params: Optional[Tuple] = None) -> QueryResult:
-        """带超时控制的查询执行"""
+        """Query execution with timeout control"""
         if not sql or not sql.strip():
             return QueryResult(success=False, error="Query cannot be empty")
 
@@ -321,16 +318,10 @@ class DatabaseManager:
         insert_statement_list = []
         for table_info in schema['tables'].values():
             insert_statements_for_table = table_info.get('insert_statement')
-            
-            # 在尝试添加前，先检查它是否为有效值 (不是 None 或空字符串)
             if insert_statements_for_table:
-                # 你的 _get_table_info 函数将一个表的所有INSERT语句合并成了一个字符串。
-                # 我们应该用 .append() 将这个字符串作为一个整体添加到列表中。
-                # (之前的 .extend() 会错误地将字符串拆成单个字符添加)
                 insert_statement_list.append(insert_statements_for_table)
                 
         return insert_statement_list
-
 
     def get_create_statements_and_insert_statements(self, db_id: str) -> tuple:
         if not self.database_exists(db_id):
@@ -385,5 +376,4 @@ class DatabaseManager:
     def get_number_of_special_column(self, db_id):
         """get the number of secial column"""
         with self.get_connection(db_id) as conn:
-            return self.connector._get_number_of_special_column(conn)
-
+            return self.connector.get_number_of_special_column(conn)

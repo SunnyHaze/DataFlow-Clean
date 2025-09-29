@@ -1,5 +1,4 @@
 import random
-from typing import Dict, List, Optional
 import pandas as pd
 import re
 from dataflow.prompts.text2sql import SQLVariationGeneratorPrompt

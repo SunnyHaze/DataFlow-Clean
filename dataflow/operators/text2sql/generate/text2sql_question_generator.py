@@ -221,10 +221,5 @@ class Text2SQLQuestionGenerator(OperatorABC):
         self.logger.info(f"Successfully processed: {len(processed_results)}")
         if failed_data:
             self.logger.warning(f"Failed to generate questions for: {len(failed_data)} entries")
-        
-        if self.output_question_key in raw_dataframe.columns:
-            return []
-        else:
-            return [self.output_question_key]
 
-            return [self.output_question_key, self.output_evidence_key]
+        return [self.output_question_key, self.output_evidence_key]
