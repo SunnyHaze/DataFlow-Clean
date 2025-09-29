@@ -398,11 +398,6 @@ class SelectSQLGeneratorPrompt:
 
 class SelectVecSQLGeneratorPrompt:
     def __init__(self):
-        # --- Start of Modifications ---
-        # 移除了所有普通SQL的标准定义(simple_criterion, moderate_criterion等)
-        # 只保留VecSQL的标准
-        # --- End of Modifications ---
-
         self.simple_vec_criterion = '''**Criteria:**
         Simple KNN queries in SQLite-vec may satisfy one or more of the following criteria:
         - Basic vector similarity search on a single table
@@ -541,10 +536,6 @@ class SelectVecSQLGeneratorPrompt:
         WHERE pa.correct_predictions > 2
         ORDER BY g.game_id;
         ```'''
-
-        # --- Start of Modifications ---
-        # 移除了 complexity2criterion 字典
-        # --- End of Modifications ---
 
         self.complexity2criterion_vec = {
             "Simple": self.simple_vec_criterion,
