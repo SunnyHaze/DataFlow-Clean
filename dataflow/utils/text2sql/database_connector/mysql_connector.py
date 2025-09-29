@@ -1,10 +1,9 @@
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 from dataflow import get_logger
 from ..base import DatabaseConnectorABC, DatabaseInfo, QueryResult
 import pymysql
 import pymysql.cursors
 import time
-import re
 
 class MySQLConnector(DatabaseConnectorABC):
     """MySQL database connector implementation with full schema support"""
@@ -312,20 +311,20 @@ class MySQLConnector(DatabaseConnectorABC):
         """
         count = 0
         try:
-            # 获取数据库的完整结构信息
+            # Get the complete structure information of the database
             schema = self.get_schema_info(connection)
             
-            # 从schema中获取所有的表信息
+            # Get all the table information from the schema
             tables = schema.get('tables', {})
             
-            # 遍历每一个表
+            # Traverse each table
             for table_name, table_info in tables.items():
-                # 从表信息中获取所有的列名字典
+                # Get all the column names from the table information
                 columns = table_info.get('columns', {})
                 
-                # 遍历列名
+                # Traverse the column names
                 for column_name in columns.keys():
-                    # 检查列名是否以'_embedding'结尾
+                    # Check if the column name ends with '_embedding'
                     if isinstance(column_name, str) and column_name.endswith('_embedding'):
                         count += 1
                         

@@ -216,26 +216,26 @@ class SQLiteConnector(DatabaseConnectorABC):
         
         return databases
 
-    def _get_number_of_special_column(self, connection: sqlite3.Connection) -> int:
+    def get_number_of_special_column(self, connection: sqlite3.Connection) -> int:
         """
-        get the number of columns in database
+        Get the number of columns in database
         """
         count = 0
         try:
-            # 获取数据库的完整结构信息
+            # Get the complete structure information of the database
             schema = self.get_schema_info(connection)
             
-            # 从schema中获取所有的表信息
+            # Get all the table information from the schema
             tables = schema.get('tables', {})
             
-            # 遍历每一个表
+            # Traverse each table
             for table_name, table_info in tables.items():
-                # 从表信息中获取所有的列名列表
+                # Get all the column names from the table information
                 columns = table_info.get('columns', [])
                 
-                # 直接遍历列名字符串列表
+                # Directly traverse the list of column names
                 for column_name in columns:
-                    # 检查变量是否为字符串
+                    # Check if the variable is a string
                     if isinstance(column_name, str):
                         count += 1
                         
