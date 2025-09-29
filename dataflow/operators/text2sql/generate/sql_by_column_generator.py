@@ -1,7 +1,4 @@
-import os
 import random
-from typing import Dict, List, Optional
-import numpy as np
 import pandas as pd
 import re
 from dataflow.prompts.text2sql import SelectSQLGeneratorPrompt
@@ -91,7 +88,7 @@ class SQLByColumnGenerator(OperatorABC):
                     db_engine=self.database_manager.db_type
                 )
                 prompts.append({"prompt": prompt, "db_id": db_name})
-            
+                
         if not prompts:
             self.logger.warning("No prompts generated, please check the database path and file")
             return [self.output_sql_key, self.output_db_id_key]

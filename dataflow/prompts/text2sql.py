@@ -395,14 +395,9 @@ class SelectSQLGeneratorPrompt:
         )
         return prompt
 
-# need database manager to determine if this is vector database
+
 class SelectVecSQLGeneratorPrompt:
     def __init__(self):
-        # --- Start of Modifications ---
-        # 移除了所有普通SQL的标准定义(simple_criterion, moderate_criterion等)
-        # 只保留VecSQL的标准
-        # --- End of Modifications ---
-        
         self.simple_vec_criterion = '''**Criteria:**
         Simple KNN queries in SQLite-vec may satisfy one or more of the following criteria:
         - Basic vector similarity search on a single table
@@ -541,10 +536,6 @@ class SelectVecSQLGeneratorPrompt:
         WHERE pa.correct_predictions > 2
         ORDER BY g.game_id;
         ```'''
-
-        # --- Start of Modifications ---
-        # 移除了 complexity2criterion 字典
-        # --- End of Modifications ---
 
         self.complexity2criterion_vec = {
             "Simple": self.simple_vec_criterion,
@@ -830,7 +821,6 @@ class SelectVecSQLGeneratorPrompt:
     
     def build_prompt(self, insert_statements: List[str], create_statements: List[str], db_engine: str) -> tuple[str, str]:
         random.seed(42)
-        # The keys are now only from the vec criterion dictionary
         complexity = random.sample(list(self.complexity2criterion_vec.keys()), 1)[0]
 
         if len(insert_statements) == 0:
@@ -863,7 +853,6 @@ class SelectVecSQLGeneratorPrompt:
             column_count=column_count,
             embedding_model="\'all-MiniLM-L6-v2\'"
         )
-        # print(f"prompt:{prompt}, complexity:{complexity}")
         return prompt, complexity
 
 
@@ -1057,6 +1046,7 @@ class Text2SQLQuestionGeneratorPrompt:
         )
 
         return prompt
+
 
 class Text2VecSQLQuestionGeneratorPrompt:
     def __init__(self):

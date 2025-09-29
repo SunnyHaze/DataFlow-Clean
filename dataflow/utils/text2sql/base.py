@@ -49,7 +49,7 @@ class DatabaseConnectorABC(ABC):
         pass
 
     @abstractmethod
-    def _get_number_of_special_column(self, connection: Any):
+    def get_number_of_special_column(self, connection: Any):
         """Get number of column which has spicial meaning"""
         pass
 

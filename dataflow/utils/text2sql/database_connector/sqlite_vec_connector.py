@@ -4,14 +4,9 @@ import sqlite3
 import glob
 import os
 import threading
-
-# 导入文件锁，用于处理多进程间的并发问题
 from filelock import FileLock
-
-# 使用DataFlow的日志记录器
 from dataflow import get_logger
 
-# 导入必要的sqlite扩展库
 try:
     import sqlite_vec
     import sqlite_lembed
@@ -23,119 +18,41 @@ except ImportError:
     )
     exit()
 
-
 # ============== SQLite Connector ==============
 class SQLiteVecConnector(DatabaseConnectorABC):
-    """
-    一个更健壮的、线程安全和进程安全的 SQLite 向量数据库连接器。
-    这个最终版本结合了两种策略，以同时解决并发崩溃和模型未注册的问题。
-    """
-    # 类级别的锁，用于保护下面的字典和集合，确保线程安全
     _class_lock = threading.Lock()
-    # 每个数据库路径对应一个线程锁，用于控制初始化过程和模型加载
     _db_init_locks: Dict[str, threading.Lock] = {}
-    # 记录已经完成磁盘初始化（模型写入文件）的数据库路径
     _initialized_dbs = set()
 
     def __init__(self):
         self.logger = get_logger()
-        # 每个实例仍然使用自己的线程本地存储
         self._thread_local = threading.local()
 
-    # def connect(self, connection_info: Dict) -> sqlite3.Connection:
-    #     """
-    #     连接到数据库。为每个调用线程返回一个独立的连接，并确保危险的初始化只进行一次，
-    #     同时为每个连接安全地加载模型到内存中。
-    #     """
-    #     db_path = connection_info.get('path')
-    #     if not db_path:
-    #         raise ValueError("Connection info must contain a 'path' key.")
-
-    #     # 检查当前线程是否已存在此数据库的连接
-    #     if not hasattr(self._thread_local, 'connections'):
-    #         self._thread_local.connections = {}
-    #     if db_path in self._thread_local.connections:
-    #         return self._thread_local.connections[db_path]
-
-    #     # 线程安全地获取或创建“初始化/加载”锁
-    #     with self._class_lock:
-    #         if db_path not in self._db_init_locks:
-    #             self._db_init_locks[db_path] = threading.Lock()
-        
-    #     init_lock = self._db_init_locks[db_path]
-
-    #     # 步骤 1: 一次性初始化（确保模型已写入DB文件）
-    #     # 这个代码块在每个进程中只对一个DB文件执行一次。
-    #     with init_lock:
-    #         if db_path not in self._initialized_dbs:
-    #             self.logger.info(f"'{db_path}' is not initialized in this process. Performing one-time disk setup...")
-    #             self._initialize_database_disk_state(connection_info)
-    #             self._initialized_dbs.add(db_path)
-
-    #     # 步骤 2: 为当前线程创建自己的连接
-    #     self.logger.debug(f"Thread {threading.get_ident()} creating new DB connection for '{db_path}'...")
-    #     conn = sqlite3.connect(
-    #         db_path,
-    #         timeout=30.0,
-    #         check_same_thread=False
-    #     )
-    #     conn.row_factory = sqlite3.Row
-        
-    #     # 步骤 3: 为每个新连接加载/激活模型到内存
-    #     # 即使模型已在DB文件中，每个连接也需要被告知去加载它。
-    #     # 为了防止并发调用C扩展导致崩溃，我们用同一个锁来序列化这个加载过程。
-    #     model_name = connection_info.get('model_name')
-    #     model_path = connection_info.get('model_path')
-    #     with init_lock:
-    #         self.logger.debug(f"Configuring connection for thread {threading.get_ident()}...")
-    #         conn.enable_load_extension(True)
-    #         sqlite_vec.load(conn)
-    #         sqlite_lembed.load(conn)
-
-    #         if model_name and model_path:
-    #             self.logger.debug(f"Activating model '{model_name}' for connection on thread {threading.get_ident()}...")
-    #             register_sql = """
-    #             INSERT OR IGNORE INTO main.lembed_models (name, model)
-    #             VALUES (?, lembed_model_from_file(?))
-    #             """
-    #             try:
-    #                 # 这个操作现在是线程安全的。第一个线程会从文件加载模型并写入DB。
-    #                 # 后续线程也会尝试，但`INSERT OR IGNORE`会跳过写入，
-    #                 # 同时`lembed_model_from_file`会将其加载到当前连接的内存中。
-    #                 conn.execute(register_sql, (model_name, model_path))
-    #                 conn.commit()
-    #             except Exception as e:
-    #                 self.logger.error(f"Failed to activate model '{model_name}' on new connection: {e}", exc_info=True)
-    #                 raise
-
-    #     self._thread_local.connections[db_path] = conn
-    #     self.logger.debug(f"Connection for thread {threading.get_ident()} created and configured successfully.")
-    #     return conn
     def connect(self, connection_info: Dict) -> sqlite3.Connection:
         """
-        连接到数据库。为每个调用线程返回一个独立的连接，并确保危险的初始化只进行一次，
-        同时为每个连接安全地加载模型到内存中。
+        Connect to the database. Returns an independent connection for each calling thread,
+        ensuring that dangerous initialization is performed only once, while safely loading
+        the model into memory for each connection.
         """
         db_path = connection_info.get('path')
         if not db_path:
             raise ValueError("Connection info must contain a 'path' key.")
 
-        # 检查当前线程是否已存在此数据库的连接
         if not hasattr(self._thread_local, 'connections'):
             self._thread_local.connections = {}
         if db_path in self._thread_local.connections:
             return self._thread_local.connections[db_path]
 
-        # 步骤 1: 一次性初始化（确保模型已写入DB文件）
-        # 这个代码块在每个进程中只对一个DB文件执行一次。
-        # 使用类级别的锁来确保下面的检查和 _initialize_database_disk_state 调用是线程安全的。
+        # Step 1: One-time initialization (ensure model has been written to DB file)
+        # This code block is executed only once for each DB file in each process.
+        # Use class-level lock to ensure the check and _initialize_database_disk_state call are thread-safe.
         with self._class_lock:
             if db_path not in self._initialized_dbs:
                 self.logger.info(f"'{db_path}' is not initialized in this process. Performing one-time disk setup...")
                 self._initialize_database_disk_state(connection_info)
                 self._initialized_dbs.add(db_path)
 
-        # 步骤 2: 为当前线程创建自己的连接
+        # Step 2: Create a connection for the current thread
         self.logger.debug(f"Thread {threading.get_ident()} creating new DB connection for '{db_path}'...")
         conn = sqlite3.connect(
             db_path,
@@ -144,11 +61,10 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         )
         conn.row_factory = sqlite3.Row
         
-        # 步骤 3: 为每个新连接加载扩展并激活模型（使用进程安全的FileLock）
+        # Step 3: Load extensions and activate model for each new connection
         model_name = connection_info.get('model_name')
         model_path = connection_info.get('model_path')
 
-        # 使用文件锁来确保跨多进程的安全性，防止并发调用C扩展导致崩溃
         lock_path = db_path + ".lock"
         file_lock = FileLock(lock_path, timeout=120)
 
@@ -165,7 +81,6 @@ class SQLiteVecConnector(DatabaseConnectorABC):
                 VALUES (?, lembed_model_from_file(?))
                 """
                 try:
-                    # 这个操作现在是进程和线程安全的。
                     conn.execute(register_sql, (model_name, model_path))
                     conn.commit()
                 except Exception as e:
@@ -176,15 +91,11 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         self.logger.debug(f"Connection for thread {threading.get_ident()} created and configured successfully.")
         return conn
     def _initialize_database_disk_state(self, connection_info: Dict):
-        """
-        这个方法只负责一次性的、持久化到磁盘的设置。
-        它由 `connect` 方法在线程锁和文件锁的保护下调用。
-        """
+
         db_path = connection_info['path']
         model_name = connection_info.get('model_name')
         model_path = connection_info.get('model_path')
 
-        # 使用文件锁来确保跨多进程的安全性
         lock_path = db_path + ".lock"
         file_lock = FileLock(lock_path, timeout=120)
 
@@ -214,9 +125,6 @@ class SQLiteVecConnector(DatabaseConnectorABC):
                     init_conn.close()
 
     def close(self, connection: Optional[sqlite3.Connection] = None):
-        """
-        关闭连接。
-        """
         if hasattr(self._thread_local, 'connections'):
             if connection:
                 for db_path, conn in list(self._thread_local.connections.items()):
@@ -473,26 +381,26 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         
         return databases
 
-    def _get_number_of_special_column(self, connection: sqlite3.Connection) -> int:
+    def get_number_of_special_column(self, connection: sqlite3.Connection) -> int:
         """
         get the number of vector columns in database
         """
         count = 0
         try:
-            # 获取数据库的完整结构信息
+            # Get the complete structure information of the database
             schema = self.get_schema_info(connection)
             
-            # 从schema中获取所有的表信息
+            # Get all the table information from the schema
             tables = schema.get('tables', {})
             
-            # 遍历每一个表
+            # Traverse each table
             for table_name, table_info in tables.items():
-                # 从表信息中获取所有的列名列表
+                # Get all the column names from the table information
                 columns = table_info.get('columns', [])
                 
-                # 直接遍历列名字符串列表
+                # Directly traverse the list of column names
                 for column_name in columns:
-                    # 检查变量是否为字符串，以及其是否以 "_embedding" 结尾
+                    # Check if the variable is a string, and whether it ends with "_embedding"
                     if isinstance(column_name, str) and column_name.endswith("_embedding"):
                         count += 1
                         

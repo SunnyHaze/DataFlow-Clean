@@ -1,10 +1,9 @@
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple
 from dataflow import get_logger
 from ..base import DatabaseConnectorABC, DatabaseInfo, QueryResult
 import pymysql
 import pymysql.cursors
 import time
-import re
 
 class MySQLConnector(DatabaseConnectorABC):
     """MySQL database connector implementation with full schema support"""
@@ -50,7 +49,8 @@ class MySQLConnector(DatabaseConnectorABC):
             if sql.strip().upper().startswith(('SELECT', 'SHOW', 'DESC', 'EXPLAIN')):
                 rows = cursor.fetchall()
                 columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                data = [dict(zip(columns, row)) for row in rows] if columns else []
+                # Since we're using DictCursor, rows are already dictionaries
+                data = rows if rows else []
             else:
                 raise Exception("Write operations are not allowed in read-only mode")
             
@@ -58,15 +58,13 @@ class MySQLConnector(DatabaseConnectorABC):
                 success=True,
                 data=data,
                 columns=columns,
-                row_count=len(data),
-                execution_time=time.time() - start_time
+                row_count=len(data)
             )
         except Exception as e:
             self.logger.error(f"Query failed: {e}\nSQL: {sql}")
             return QueryResult(
                 success=False,
-                error=str(e),
-                execution_time=time.time() - start_time
+                error=str(e)
             )
         finally:
             if cursor:
@@ -267,6 +265,8 @@ class MySQLConnector(DatabaseConnectorABC):
                 db_details.extend(table_info['insert_statement'])
         
         return "\n\n".join(db_details)
+
+    
     
     def discover_databases(self, config: Dict) -> Dict[str, DatabaseInfo]:
         """Discover MySQL databases on server"""
@@ -279,12 +279,14 @@ class MySQLConnector(DatabaseConnectorABC):
             
             # Get database list
             result = self.execute_query(conn, 
-                "SELECT schema_name FROM information_schema.schemata "
+                "SELECT schema_name as db_name FROM information_schema.schemata "
                 "WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')")
             
             if result.success:
                 for row in result.data:
-                    db_name = row['schema_name']
+                    db_name = row.get('db_name')
+                    if not db_name:
+                        continue
                     databases[db_name] = DatabaseInfo(
                         db_id=db_name,
                         db_type='mysql',
@@ -302,3 +304,33 @@ class MySQLConnector(DatabaseConnectorABC):
             self.logger.error(f"Database discovery failed: {e}")
         
         return databases
+
+    def get_number_of_special_column(self, connection: pymysql.Connection) -> int:
+        """
+        Get the number of columns ending with '_embedding' in database
+        """
+        count = 0
+        try:
+            # Get the complete structure information of the database
+            schema = self.get_schema_info(connection)
+            
+            # Get all the table information from the schema
+            tables = schema.get('tables', {})
+            
+            # Traverse each table
+            for table_name, table_info in tables.items():
+                # Get all the column names from the table information
+                columns = table_info.get('columns', {})
+                
+                # Traverse the column names
+                for column_name in columns.keys():
+                    # Check if the column name ends with '_embedding'
+                    if isinstance(column_name, str) and column_name.endswith('_embedding'):
+                        count += 1
+                        
+        except Exception as e:
+            self.logger.error(f"Error counting embedding columns: {e}")
+
+        if count == 0:
+            self.logger.warning("No columns ending with '_embedding' found.")
+        return count
