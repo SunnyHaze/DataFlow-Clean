@@ -4,17 +4,8 @@ try:
     from sentence_transformers import SentenceTransformer
 except ImportError:
     raise ImportError(
-        """
-sentence-transformers package is not installed. Please install it using:
-
-pip install sentence-transformers
-
-Or using conda:
-conda install -c conda-forge sentence-transformers
-
-If you're in a corporate environment with network restrictions, try:
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple sentence-transformers
-"""
+        "The 'embedding' optional dependencies are required but not installed.\n"
+        "Please run: pip install 'open-dataflow[vectorsql]'"
     )
     
 import os
