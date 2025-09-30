@@ -14,14 +14,14 @@ class KBCleaning_PDFvllm_GPUPipeline():
         self.storage = FileStorage(
             first_entry_file_name="../../example_data/KBCleaningPipeline/kbc_test_1.jsonl",
             cache_path="./.cache/gpu",
-            file_name_prefix="pdf_cleaning_step",
+            file_name_prefix="knowledge_cleaning_step_vllm_engine",
             cache_type="json",
         )
 
         self.knowledge_cleaning_step1 = FileOrURLToMarkdownConverterBatch(
             intermediate_dir="../../example_data/KBCleaningPipeline/raw/",
             lang="en",
-            mineru_backend="vlm-sglang-engine",
+            mineru_backend="vlm-vllm-engine",
         )
 
         self.knowledge_cleaning_step2 = KBCChunkGenerator(

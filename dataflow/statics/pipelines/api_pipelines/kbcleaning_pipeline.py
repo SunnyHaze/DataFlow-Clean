@@ -8,13 +8,13 @@ from dataflow.operators.core_text import Text2MultiHopQAGenerator
 from dataflow.utils.storage import FileStorage
 from dataflow.serving import APILLMServing_request
 
-class KBCleaningURL_APIPipeline():
-    def __init__(self, url:str=None, raw_file:str=None):
+class KBCleaningPDF_APIPipeline():
+    def __init__(self):
 
         self.storage = FileStorage(
             first_entry_file_name="../example_data/KBCleaningPipeline/kbc_test_1.jsonl",
             cache_path="./.cache/api",
-            file_name_prefix="url_cleaning_step",
+            file_name_prefix="knowledge_cleaning_step",
             cache_type="json",
         )
 
@@ -27,7 +27,7 @@ class KBCleaningURL_APIPipeline():
         self.knowledge_cleaning_step1 = FileOrURLToMarkdownConverterBatch(
             intermediate_dir="../example_data/KBCleaningPipeline/raw/",
             lang="en",
-            mineru_backend="vlm-sglang-engine",
+            mineru_backend="vlm-vllm-engine",
         )
 
         self.knowledge_cleaning_step2 = KBCChunkGenerator(
@@ -48,7 +48,7 @@ class KBCleaningURL_APIPipeline():
         )
 
     def forward(self):
-        self.knowledge_cleaning_step1.run(
+        extracted=self.knowledge_cleaning_step1.run(
             storage=self.storage.step(),
             # input_key=,
             # output_key=,
@@ -65,14 +65,12 @@ class KBCleaningURL_APIPipeline():
             # input_key=,
             # output_key=,
         )
-
         self.knowledge_cleaning_step4.run(
             storage=self.storage.step(),
             # input_key=,
             # output_key=,
         )
-
+        
 if __name__ == "__main__":
-    model = KBCleaningURL_APIPipeline()
+    model = KBCleaningPDF_APIPipeline()
     model.forward()
-
