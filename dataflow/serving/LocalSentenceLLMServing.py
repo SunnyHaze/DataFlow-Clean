@@ -1,13 +1,3 @@
-import torch
-
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    raise ImportError(
-        "The 'embedding' optional dependencies are required but not installed.\n"
-        "Please run: pip install 'open-dataflow[vectorsql]'"
-    )
-    
 import os
 import time
 from typing import List
@@ -44,11 +34,40 @@ class LocalEmbeddingServing(LLMServingABC):
         self.max_workers = max_workers
         self.max_retries = max_retries
 
+        self._model = None
+        self._torch = None
+        self._SentenceTransformer = None
+        self._initialized = False
+        
+        self._device = device
+
+    def _ensure_dependencies_available(self):
+        if self._torch is not None and self._SentenceTransformer is not None:
+            return
+            
+        try:
+            import torch
+            from sentence_transformers import SentenceTransformer
+            self._torch = torch
+            self._SentenceTransformer = SentenceTransformer
+        except ImportError:
+            raise ImportError(
+                "The 'embedding' optional dependencies are required but not installed.\n"
+                "Please run: pip install 'open-dataflow[vectorsql]'"
+            )
+
+    def _initialize_model(self):
+        if self._initialized:
+            return
+            
+        self._ensure_dependencies_available()
+        
         self._execution_strategy = "single_device"
         self._target_devices = None
 
+        device = self._device
         if device is None:
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            device = 'cuda' if self._torch.cuda.is_available() else 'cpu'
 
         if self.max_workers > 1:
             if 'cpu' in device:
@@ -62,7 +81,7 @@ class LocalEmbeddingServing(LLMServingABC):
                     self.logger.warning("max_workers > 1 but only 1 CPU core detected, falling back to single device mode.")
 
             elif 'cuda' in device:
-                gpu_count = torch.cuda.device_count()
+                gpu_count = self._torch.cuda.device_count()
                 if gpu_count > 1:
                     num_gpus_to_use = min(self.max_workers, gpu_count)
                     
@@ -79,11 +98,19 @@ class LocalEmbeddingServing(LLMServingABC):
         if self._execution_strategy == "gpu_parallel":
             self.primary_device = self._target_devices[0]
         else:
-            self.primary_device = 'cuda:0' if 'cuda' in device and torch.cuda.is_available() else 'cpu'
+            self.primary_device = 'cuda:0' if 'cuda' in device and self._torch.cuda.is_available() else 'cpu'
 
         self.logger.info(f"Loading model '{self.model_name}' to primary device '{self.primary_device}'...")
-        self.model = SentenceTransformer(self.model_name, device=self.primary_device)
+        self._model = self._SentenceTransformer(self.model_name, device=self.primary_device)
         self.logger.info("Model loaded successfully.")
+        
+        self._initialized = True
+
+    @property
+    def model(self):
+        if not self._initialized:
+            self._initialize_model()
+        return self._model
 
     def start_serving(self) -> None:
         self.logger.info("LocalEmbeddingServing: No need to start independent service, model is already in memory.")
@@ -95,6 +122,9 @@ class LocalEmbeddingServing(LLMServingABC):
         """
         Generate embeddings for a list of texts, including retry logic and parallel execution logic.
         """
+        if not self._initialized:
+            self._initialize_model()
+            
         last_exception = None
         for attempt in range(self.max_retries):
             try:
@@ -130,10 +160,19 @@ class LocalEmbeddingServing(LLMServingABC):
         return []
 
     def cleanup(self):
+        if not self._initialized:
+            self.logger.info("Model not initialized, nothing to clean up.")
+            return
+            
         self.logger.info(f"Cleaning up resources for model '{self.model_name}'...")
-        del self.model
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        if self._model is not None:
+            del self._model
+            self._model = None
+            
+        if self._torch is not None and self._torch.cuda.is_available():
+            self._torch.cuda.empty_cache()
+            
+        self._initialized = False
         self.logger.info("Cleanup completed.")
 
     def generate_from_input(self, user_inputs: List[str], system_prompt: str = "") -> List[str]:
