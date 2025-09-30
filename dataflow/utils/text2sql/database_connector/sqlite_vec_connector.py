@@ -10,13 +10,12 @@ from dataflow import get_logger
 try:
     import sqlite_vec
     import sqlite_lembed
-except ImportError:
-    logger = get_logger()
-    logger.fatal(
-        "Fatal Error: 'sqlite_vec' or 'sqlite_lembed' not installed. "
-        "Please run 'pip install sqlite-vec sqlite-lembed'"
-    )
-    exit()
+except ImportError as e:
+    raise Exception(
+        "Missing required dependencies: 'sqlite-vec' and/or 'sqlite-lembed'.\n"
+        "Please install them with:\n"
+        "    pip install sqlite-vec sqlite-lembed"
+    ) from e
 
 # ============== SQLite Connector ==============
 class SQLiteVecConnector(DatabaseConnectorABC):
