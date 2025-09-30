@@ -29,8 +29,6 @@ func_timeout
 sqlglot
 pymysql
 sentence-transformers
-sqlite-vec
-sqlite-lembed
 # general text
 fasttext-wheel
 langkit
