@@ -17,7 +17,7 @@ def is_url(string):
     except ValueError:
         return False
 
-def _parse_file_with_mineru(raw_file: str, output_file: str, mineru_backend: str = "vlm-sglang-engine") -> str:
+def _parse_file_with_mineru(raw_file: str, output_file: str, mineru_backend: str = "vlm-vllm-engine") -> str:
     """
     Uses MinerU to parse PDF/image files (pdf/png/jpg/jpeg/webp/gif) into Markdown files.
 
@@ -55,7 +55,8 @@ Please make sure you have GPU on your machine.
     
     os.environ['MINERU_MODEL_SOURCE'] = "local"  # 可选：从本地加载模型
 
-    MinerU_Version = {"pipeline": "auto", "vlm-sglang-engine": "vlm"}
+    # pipeline|vlm-transformers|vlm-vllm-engine|vlm-http-client
+    MinerU_Version = {"pipeline": "auto", "vlm-transformers": "vlm", 'vlm-vllm-engine': 'vlm', 'vlm-http-client': 'vlm'}
 
     raw_file = Path(raw_file)
     # import pdb; pdb.set_trace()
