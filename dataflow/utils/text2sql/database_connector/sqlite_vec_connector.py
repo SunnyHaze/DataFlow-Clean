@@ -7,14 +7,6 @@ import threading
 from filelock import FileLock
 from dataflow import get_logger
 
-try:
-    import sqlite_vec
-    import sqlite_lembed
-except ImportError:
-    raise ImportError(
-        "The 'vectorsql' optional dependencies are required but not installed.\n"
-        "Please run: pip install 'open-dataflow[vectorsql]'"
-    )
 
 # ============== SQLite Connector ==============
 class SQLiteVecConnector(DatabaseConnectorABC):
@@ -25,6 +17,22 @@ class SQLiteVecConnector(DatabaseConnectorABC):
     def __init__(self):
         self.logger = get_logger()
         self._thread_local = threading.local()
+        self._extensions_loaded = False
+
+    def _ensure_extensions_available(self):
+        if hasattr(self, '_sqlite_vec') and hasattr(self, '_sqlite_lembed'):
+            return
+            
+        try:
+            import sqlite_vec
+            import sqlite_lembed
+            self._sqlite_vec = sqlite_vec
+            self._sqlite_lembed = sqlite_lembed
+        except ImportError:
+            raise ImportError(
+                "The 'vectorsql' optional dependencies are required but not installed.\n"
+                "Please run: pip install 'open-dataflow[vectorsql]'"
+            )
 
     def connect(self, connection_info: Dict) -> sqlite3.Connection:
         """
@@ -32,6 +40,8 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         ensuring that dangerous initialization is performed only once, while safely loading
         the model into memory for each connection.
         """
+        self._ensure_extensions_available()
+        
         db_path = connection_info.get('path')
         if not db_path:
             raise ValueError("Connection info must contain a 'path' key.")
@@ -69,8 +79,8 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         with file_lock:
             self.logger.debug(f"Process-safe lock acquired by thread {threading.get_ident()}. Configuring connection...")
             conn.enable_load_extension(True)
-            sqlite_vec.load(conn)
-            sqlite_lembed.load(conn)
+            self._sqlite_vec.load(conn)
+            self._sqlite_lembed.load(conn)
 
             if model_name and model_path:
                 self.logger.debug(f"Activating model '{model_name}' for connection...")
@@ -88,8 +98,10 @@ class SQLiteVecConnector(DatabaseConnectorABC):
         self._thread_local.connections[db_path] = conn
         self.logger.debug(f"Connection for thread {threading.get_ident()} created and configured successfully.")
         return conn
-    def _initialize_database_disk_state(self, connection_info: Dict):
 
+    def _initialize_database_disk_state(self, connection_info: Dict):
+        self._ensure_extensions_available()
+        
         db_path = connection_info['path']
         model_name = connection_info.get('model_name')
         model_path = connection_info.get('model_path')
@@ -103,8 +115,8 @@ class SQLiteVecConnector(DatabaseConnectorABC):
                 init_conn = sqlite3.connect(db_path, timeout=30.0)
                 init_conn.execute("PRAGMA journal_mode=WAL;")
                 init_conn.enable_load_extension(True)
-                sqlite_vec.load(init_conn)
-                sqlite_lembed.load(init_conn)
+                self._sqlite_vec.load(init_conn)
+                self._sqlite_lembed.load(init_conn)
 
                 if model_name and model_path:
                     if not os.path.exists(model_path):
