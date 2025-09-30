@@ -28,6 +28,7 @@ gradio>5
 func_timeout
 sqlglot
 pymysql
+sentence-transformers
 # general text
 fasttext-wheel
 langkit
