@@ -33,7 +33,7 @@ class Text2QAGenerator:
     def get_desc(lang: str = "zh"):
         if lang == "zh":
             return (
-                "该算子用于为给的的文档片段生成种子QA对。\n\n"
+                "该算子用于为给定的文档片段生成种子QA对。\n\n"
                 "输入参数：\n"
                 "- input_key: 包含文档片段的字段名\n"
                 "- prompt_key: 包含提示词的字段名\n"
@@ -42,7 +42,7 @@ class Text2QAGenerator:
             )
         elif lang == "en":
             return (
-                "This operator generates generate seed QA pairs for given document fragments.\n\n"
+                "This operator generates seed QA pairs for given document fragments.\n\n"
                 "Input Parameters:\n"
                 "- input_key: Field name containing the content\n"
                 "- prompt_key: Field name containing the generated prompt\n"
@@ -131,5 +131,6 @@ class Text2QAGenerator:
 
         output_file = storage.write(dataframe)
         self.logger.info(f"Results saved to {output_file}")
+
 
         return [self.output_question_key, self.output_answer_key]
