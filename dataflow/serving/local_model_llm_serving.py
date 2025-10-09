@@ -7,8 +7,6 @@ from dataflow import get_logger
 from huggingface_hub import snapshot_download
 from dataflow.core import LLMServingABC
 from transformers import AutoTokenizer
-import json
-from pydantic import BaseModel, Field
 
 class LocalModelLLMServing_vllm(LLMServingABC):
     '''
