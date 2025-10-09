@@ -29,29 +29,11 @@ class Qwen_generator():
             },
         )
 
-        self.prompt_generator2 = PromptedGenerator(
-            llm_serving = self.llm_serving, 
-            system_prompt = "Please translate to Chinese.", # System prompt for translation
-            json_schema={
-                "type": "object",
-                "properties": {
-                    "translation": {"type": "string"}
-                },
-                "required": ["translation"],
-            },
-        )
-
     def forward(self):
         # Initial filters
         self.prompt_generator.run(
             storage = self.storage.step(),
             input_key = "raw_content",
-        )
-
-        self.prompt_generator2.run(
-            storage = self.storage.step(),
-            input_key = "generated_content",
-            output_key= "generated_content2",
         )
 
 if __name__ == "__main__":
