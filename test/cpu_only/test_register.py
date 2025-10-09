@@ -112,7 +112,7 @@ def test_all_operator_registry():
 
         if disallowed:
             invalid_prompts.append((name, cls.__module__, disallowed))
-
+    errors = []
     # 报告结果
     if invalid_prompts:
         print("\n❌ Check failed, invalid Prompt classes contain disallowed functions:")
@@ -137,7 +137,7 @@ def test_all_operator_registry():
             for name, module, funcs in invalid_prompts
         )
 
-        errors = []
+
         errors.append(
             f"❌ Found {len(invalid_prompts)} Prompt classes violating naming rules.\n"
             f"{rule_explanation}\n"
