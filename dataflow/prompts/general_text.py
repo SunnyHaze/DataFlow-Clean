@@ -700,7 +700,7 @@ class ConsistentQueryPrompt(PromptABC):
         }
     
     def build_prompt(self, num_dialogs_per_intent):
-        prompt = f"""
+        prompt = """
         Task Description and Rules 
         1. Generate multiple rounds of realistic user questions based on the provided topic: 
         - Based on a single core topic (provided directly by the user), generate multiple rounds of realistic user questions, comprising 6-8 turns in total. 
